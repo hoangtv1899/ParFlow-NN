@@ -1,0 +1,40 @@
+from neural_net.cbrain.model_diagnostics_PF import *
+from neural_net.cbrain.data_generator import *
+from neural_net.cbrain.legacy.losses import *
+from neural_net.cbrain.models import *
+from neural_net.cbrain.utils import *
+from preprocess.parsePF import *
+from preprocess.preprocess_PF import *
+import time
+
+loss_dict = {
+    'mae': 'mae',
+    'mse': 'mse',
+    'log_loss': log_loss,
+}
+
+reinforce_feature_da  =xr.open_dataset('nc_file/LW_3d_train_features.nc')
+target_da = xr.open_dataset('nc_file/LW_3d_train_targets.nc')
+feature_shape =reinforce_feature_da.data_vars['features'].shape[1]
+target_shape = target_da.data_vars['targets'].shape[1]
+reinforce_feature_da = reinforce_feature_da.data_vars['features'].data
+target_da = target_da.data_vars['targets'].data
+reinforce_feature_da = reinforce_feature_da.reshape(-1,1,feature_shape)
+target_da = target_da.reshape(-1,1,target_shape)
+model = lstm_model(
+		feature_shape,
+            target_shape,
+            [256,256,256,256,256,256,256],
+            1e-3,
+            loss_dict['mse'],
+            batch_norm=False,
+            activation='relu',
+            dr=None,
+            l2=None,
+            partial_relu=False,
+	        eq=False,
+            fsub='feature_means',
+            fdiv='max_rs',
+        )
+
+model.fit(reinforce_feature_da,target_da,epochs=18,batch_size=41*41)

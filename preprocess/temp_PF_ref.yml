@@ -1,0 +1,4 @@
+inputs : [prev_press,precip,slope_x,slope_y,perm,poros,rel_perm_alpha,rel_perm_N,satur_alpha,satur_N,satur_sres,satur_ssat,tensor_x,tensor_y,tensor_z,spec_storage,mannings]
+outputs : [press,satur]
+in_dir : /local_scratch/5636475/NN/nc_file/
+out_dir: /local_scratch/5636475/NN/nc_file/
