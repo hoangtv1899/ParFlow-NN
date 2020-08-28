@@ -1,0 +1,14 @@
+cond-rnn
+configargparse
+fire
+h5py
+ipykernel
+jupyter
+keras
+matplotlib
+netcdf4
+numpy
+seaborn
+tensorflow
+tqdm
+xarray
