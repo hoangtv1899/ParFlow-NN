@@ -22,6 +22,11 @@ issues with the CUDA Toolkit.
 pip install -r requirements.txt
 ```
 
+After installing all dependencies, install `pfio` in the currently active environment.
+```
+pip install git+https://github.com/hoangtv1899/pfio.git
+```
+
 Simulation
 --------------------
 
