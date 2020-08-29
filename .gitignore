@@ -3,8 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-#run ouputs
-./washita/tcl_scripts/Outputs1/
+#ignore run outputs and netcdfs
+washita/tcl_scripts/Outputs1/*
+nc_file/
 
 # C extensions
 *.so
