@@ -40,7 +40,7 @@ var_outs['perm'].shape
 os.getcwd()
 outdirs = os.listdir('..')
 
-if 'ncfile' not in outdirs :
+if 'nc_file' not in outdirs :
     os.makedirs("../nc_file")
 
 
