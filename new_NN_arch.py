@@ -364,7 +364,7 @@ fig,axs = plt.subplots(4,5,figsize=(16,8))
 for jj,ii in enumerate([0,50,51,52,53,103,153,203,253,303,353,403,453,454,455,456,457]):
     ax = axs[jj//5,jj%5]
     ax.imshow(new_merg_feature_da[0,5,ii,:,:])
-    ax.set_title(new_merg_names[ii])
+    #ax.set_title(new_merg_names[ii])
 #plt.imshow(new_merg_feature_da[0,5,0,:,:])
 #plt.colorbar()
 
