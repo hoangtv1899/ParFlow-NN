@@ -6,5 +6,21 @@ channels:
 dependencies:
   - python=3.8
   - pip
+  - configargparse
+  - graphviz
+  - h5py
+  - ipykernel
+  - jupyter
+  - keras
+  - matplotlib
+  - netcdf4
+  - numpy
+  - pydot
+  - seaborn
+  - tensorflow
+  - tqdm
+  - xarray
   - pip:
-    - -r requirements.txt
+    - cond-rnn
+    - fire
+    - git+https://github.com/hoangtv1899/pfio.git

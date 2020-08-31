@@ -360,10 +360,10 @@ final_model.fit(
 
 # %%
 #pred = final_model.predict(new_merg_feature_da[:,:10,:,:,:])
-fig,axs = plt.subplots(4,5,figsize=(16,8))
-for jj,ii in enumerate([0,50,51,52,53,103,153,203,253,303,353,403,453,454,455,456,457]):
-    ax = axs[jj//5,jj%5]
-    ax.imshow(new_merg_feature_da[0,5,ii,:,:])
+# fig,axs = plt.subplots(4,5,figsize=(16,8))
+# for jj,ii in enumerate([0,50,51,52,53,103,153,203,253,303,353,403,453,454,455,456,457]):
+#     ax = axs[jj//5,jj%5]
+#     ax.imshow(new_merg_feature_da[0,5,ii,:,:])
     #ax.set_title(new_merg_names[ii])
 #plt.imshow(new_merg_feature_da[0,5,0,:,:])
 #plt.colorbar()
@@ -371,7 +371,7 @@ for jj,ii in enumerate([0,50,51,52,53,103,153,203,253,303,353,403,453,454,455,45
 
 # %%
 # define the checkpoint
-filepath = "/glade/scratch/hoangtran/ssd_NN/NN/saved_models/lstm_model_003.h5"
+# filepath = "/glade/scratch/hoangtran/ssd_NN/NN/saved_models/lstm_model_003.h5"
 new_model = keras.models.load_model(filepath, custom_objects={"tf": tf,
                                                                     "rmse":rmse,
                                                                      'log_loss': log_loss,
@@ -386,7 +386,7 @@ new_model.fit(
            prev_press_feature_da[:,:time_step,:,:,:],
            forcing_feature_da[:,:time_step,:,:,:]], 
         y=np.reshape(subset_target,(subset_target.shape[0],subset_target.shape[1],-1)),
-        epochs=200, batch_size=nlat*nlon,
+        epochs=20, batch_size=nlat*nlon,
         callbacks=callbacks_list)
 
 
@@ -420,7 +420,7 @@ plt.colorbar()
 
 
 # %%
-keras.utils.vis_utils.plot_model(new_model,to_file='model2.png', show_shapes=True, show_layer_names=True)
+keras.utils.plot_model(new_model,to_file='model2.png', show_shapes=True, show_layer_names=True)
 
 
 # %%
