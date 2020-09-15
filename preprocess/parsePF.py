@@ -7,9 +7,6 @@ import pfio
 from glob import glob
 from datetime import datetime, timedelta
 from parflowio.pyParflowio import PFData
-from parse_tcl import Pfset
-
-#import gdal
 
 
 def pfread(pfbfile):
@@ -170,33 +167,6 @@ def parse_tcl(infile, output_dir):
     else:
         print("Error finding initial condition")
         retVal = None
-
-    # -------------- Alternate Implementation check --------------- #
-    p = Pfset(infile)
-    _retVal = (
-        p['ComputationalGrid.Lower.X'],
-        p['ComputationalGrid.Lower.Y'],
-        p['ComputationalGrid.Lower.Z'],
-        p['ComputationalGrid.DX'],
-        p['ComputationalGrid.DY'],
-        p['ComputationalGrid.DZ'],
-        p.dz_scale(),
-        p['ComputationalGrid.NX'],
-        p['ComputationalGrid.NY'],
-        p['ComputationalGrid.NZ'],
-        p['Cycle.rainrec.rain.Length'],
-        p['Cycle.rainrec.rec.Length'],
-        p['Patch.z-upper.BCPressure.rain.Value'],
-        p.permeability()
-    )
-
-    # -------------- Value check --------------- #
-    for i in range(len(retVal)):
-        if i > len(_retVal)-1:
-            raise AssertionError(f'index {i} mismatch')
-        if retVal[i] != _retVal[i]:
-            raise AssertionError(f'index {i} mismatch')
-    # -------------- Alternate Implementation check --------------- #
 
     return retVal
 

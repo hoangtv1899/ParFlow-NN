@@ -1,86 +1,57 @@
-# To add a new cell, type '# %%'
-# To add a new markdown cell, type '# %% [markdown]'
-# %%
-from parsePF import *
-import time
-import matplotlib.pyplot as plt
+import sys
 import os
-os.getcwd()
+from datetime import datetime, timedelta
+from parsePF import init_arrays, init_arrays_with_press, write_nc
+import numpy as np
 
 
-# %%
-#get initial information
-in_dir = '../washita/tcl_scripts/Outputs1'
-in_file = '../washita/tcl_scripts/LW_Test.tcl'
-nx,ny,nz,dx,dy,dz,dz_scale,time_arrays,lat0,lon0,lev0,var_outs = init_arrays(in_dir, in_file)
-precip_arrs = var_outs['precip']
-init_press = var_outs['prev_press']
-del var_outs['precip']
-#del var_outs['prev_press']
+if __name__ == '__main__':
 
+    if len(sys.argv) < 3:
+        print('Usage python write_nc.py <run_dir> <tcl_file>')
+        sys.exit(0)
 
-# %%
-plt.imshow(var_outs['poros'][-2,:,:])
-plt.colorbar()
+    IN_DIR, IN_FILE = sys.argv[1:]
+    OUT_DIR = os.path.join(IN_DIR, 'nc_files')
 
+    if os.path.exists(OUT_DIR):
+        print(f'Output Folder {OUT_DIR} already exists. Exiting.')
+        sys.exit(1)
+    os.makedirs(OUT_DIR)
 
-# %%
-new_precip_arr = np.array([]).reshape(0,ny,nx)
-for p_arr in precip_arrs:
-    new_precip_arr = np.vstack([new_precip_arr,p_arr[-1,:,:][np.newaxis,...]])
-plt.plot(np.mean(new_precip_arr,axis=(1,2)))
+    run_name = os.path.basename(IN_DIR)
+    nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs \
+        = init_arrays(IN_DIR, IN_FILE)
+    precip_arrs = var_outs['precip']
+    init_press = var_outs['prev_press']
+    del var_outs['precip']
 
+    new_precip_arr = np.array([]).reshape(0, ny, nx)
+    for p_arr in precip_arrs:
+        new_precip_arr = np.vstack(
+            [new_precip_arr,p_arr[-1, :, :][np.newaxis, ...]]
+        )
 
-# %%
-var_outs['perm'].shape
+    out_nc = os.path.join(OUT_DIR, f'{run_name}_precip.nc')
+    write_nc(out_nc, nx, ny, 1, lat0, lon0, np.array([0]), time_arrays,
+             {'precip': new_precip_arr.reshape(-1, 1, ny, nx)}, islev=True)
 
+    out_nc = os.path.join(OUT_DIR, f'{run_name}_static.nc')
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0,
+             [datetime(1982, 10, 1, 6, 0)], var_outs, islev=True)
 
-# %%
-#check directory structure
-os.getcwd()
-outdirs = os.listdir('..')
+    target_arrs = init_arrays_with_press(IN_DIR, IN_FILE)
 
-if 'nc_file' not in outdirs :
-    os.makedirs("../nc_file")
+    out_nc = os.path.join(OUT_DIR, f'{run_name}_press.nc')
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays,
+             {'press': target_arrs['press']}, islev=True)
 
+    out_nc = os.path.join(OUT_DIR, f'{run_name}_satur.nc')
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays,
+             {'satur': target_arrs['satur']}, islev=True)
 
-# %%
-#write precip nc file
-
-out_nc = '../nc_file/LW_precip.nc'
-write_nc(out_nc,nx,ny,1,lat0,lon0,np.array([0]),
-         time_arrays,{'precip':new_precip_arr.reshape(-1,1,ny,nx)},
-        islev=True)
-
-
-# %%
-#write static nc file
-out_nc = '../nc_file/LW_static.nc'
-write_nc(out_nc,nx,ny,nz,lat0,lon0,lev0,[datetime(1982, 10, 1, 6, 0)],var_outs,islev=True)
-
-
-# %%
-t1 = time.time()
-target_arrs = init_arrays_with_press(in_dir, in_file)
-t2 = time.time()
-print('load target files '+str(t2-t1))
-
-
-# %%
-#write press nc file
-out_nc = '../nc_file/LW_press.nc'
-write_nc(out_nc,nx,ny,nz,lat0,lon0,lev0,time_arrays,{'press':target_arrs['press']},islev=True)
-
-
-# %%
-#write satur nc file
-out_nc = '../nc_file/LW_satur.nc'
-write_nc(out_nc,nx,ny,nz,lat0,lon0,lev0,time_arrays,{'satur':target_arrs['satur']},islev=True)
-
-
-# %%
-#write previous press nc file. Only for trainning
-out_nc = '../nc_file/LW_prev_press.nc'
-write_nc(out_nc,nx,ny,nz,lat0,lon0,lev0,[x-timedelta(hours=1) for x in time_arrays],
-        {'prev_press':[init_press]+target_arrs['press'][:-1]},islev=True)
-
+    out_nc = os.path.join(OUT_DIR, f'{run_name}_prev_press.nc')
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0,
+             [x-timedelta(hours=1) for x in time_arrays],
+             {'prev_press': [init_press]+target_arrs['press'][:-1]}, islev=True
+    )

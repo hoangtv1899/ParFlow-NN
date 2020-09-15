@@ -56,16 +56,16 @@ Simulation
 
 ```
 cd washita/tcl_scripts
-tclsh LW_test.tcl
+./model.tcl
 ```
 
 Converting ParFlow output to .nc files
 --------------------
-Please follow the python notebook file: ```preprocess/write_nc.ipynb```
+Execute the python file: ```preprocess/write_nc.py```
 
 Training ConvLSTM model
 --------------------
-Please follow the python notebook file: ```new_NN_arch.ipynb```
+Execute they python file: ```new_NN_arch.ipynb```
 
 Contacts
 --------------------

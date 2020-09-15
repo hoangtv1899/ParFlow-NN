@@ -311,14 +311,14 @@ pfset Patch.z-upper.BCPressure.rec.Value 0.0000
 #-----------------------------------------------------------------------------
 pfset TopoSlopesX.Type                                "PFBFile"
 pfset TopoSlopesX.GeomNames                           "domain"
-pfset TopoSlopesX.FileName                            "LW.slopex.pfb"
+pfset TopoSlopesX.FileName                            "slopex.pfb"
 
 #-----------------------------------------------------------------------------
 # Topo slopes in y-direction
 #-----------------------------------------------------------------------------
 pfset TopoSlopesY.Type                                "PFBFile"
 pfset TopoSlopesY.GeomNames                           "domain"
-pfset TopoSlopesY.FileName                            "LW.slopey.pfb"
+pfset TopoSlopesY.FileName                            "slopey.pfb"
 
 #-----------------------------------------------------------------------------
 # Mannings coefficient
@@ -517,9 +517,9 @@ pfset Solver.Linear.Preconditioner                       PFMG
 #-----------------------------------------------------------------------------
 # Distribute inputs
 #-----------------------------------------------------------------------------
-pfdist -nz 1 LW.slopex.pfb
-pfdist -nz 1 LW.slopey.pfb
-pfdist IndicatorFile_Gleeson.50z.pfb
+pfdist -nz 1 slopex.pfb
+pfdist -nz 1 slopey.pfb
+pfdist indicatorfile.pfb
 pfdist press.init.pfb
 
 #-----------------------------------------------------------------------------
