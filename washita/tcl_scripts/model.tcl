@@ -1,6 +1,6 @@
+#!/usr/bin/env tclsh
+
 # SCRIPT TO RUN LITTLE WASHITA DOMAIN WITH TERRAIN-FOLLOWING GRID
-# DETAILS:
-# Arugments are 1) runname 2) year
 
 # Import the ParFlow TCL package
 lappend   auto_path $env(PARFLOW_DIR)/bin
@@ -8,6 +8,13 @@ package   require parflow
 namespace import Parflow::*
 
 pfset     FileVersion    4
+
+if { $::argc != 1} {
+    puts "Usage: model <run_name>"
+    exit -1
+}
+
+set runname [lindex $::argv 0]
 
 #-----------------------------------------------------------------------------
 # Set Processor topology 
@@ -19,22 +26,27 @@ pfset Process.Topology.R 1
 #-----------------------------------------------------------------------------
 # Make a directory for the simulation and copy inputs into it
 #-----------------------------------------------------------------------------
-file mkdir "Outputs1"
-cd "./Outputs1"
+if {[file exists "runs/$runname"]} {
+    puts "Folder $runname exists in the runs/ folder. Please choose another name for your run."
+    exit -1
+}
+
+file mkdir "runs/$runname"
+cd "runs/$runname"
 
 # ParFlow Inputs
-file copy -force "../../parflow_input/LW.slopex.pfb" .
-file copy -force "../../parflow_input/LW.slopey.pfb" .
-file copy -force "../../parflow_input/IndicatorFile_Gleeson.50z.pfb"   .
-file copy -force "../../parflow_input/press.init.pfb"  .
+file copy -force "../../../parflow_input/slopex.pfb" .
+file copy -force "../../../parflow_input/slopey.pfb" .
+file copy -force "../../../parflow_input/indicatorfile.pfb"   .
+file copy -force "../../../parflow_input/press.init.pfb"  .
 
-#CLM Inputs
-#file copy -force "../../clm_input/drv_clmin.dat" .
-#file copy -force "../../clm_input/drv_vegp.dat"  .
-#file copy -force "../../clm_input/drv_vegm.alluv.dat"  . 
+# CLM Inputs
+# file copy -force "../../../clm_input/drv_clmin.dat" .
+# file copy -force "../../../clm_input/drv_vegp.dat"  .
+# file copy -force "../../../clm_input/drv_vegm.alluv.dat"  . 
 
-#file delete correct_output
-#file link -symbolic correct_output "../correct_output" 
+# file delete correct_output
+# file link -symbolic correct_output "../correct_output" 
 
 puts "Files Copied"
 
@@ -82,7 +94,7 @@ pfset Geom.domain.Patches             "x-lower x-upper y-lower y-upper z-lower z
 #-----------------------------------------------------------------------------
 pfset GeomInput.indi_input.InputType      IndicatorField
 pfset GeomInput.indi_input.GeomNames      "s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 s11 s12 s13 g1 g2 g3 g4 g5 g6 g7 g8"
-pfset Geom.indi_input.FileName            "IndicatorFile_Gleeson.50z.pfb"
+pfset Geom.indi_input.FileName            "indicatorfile.pfb"
 
 pfset GeomInput.s1.Value                1
 pfset GeomInput.s2.Value                2
@@ -299,14 +311,14 @@ pfset Patch.z-upper.BCPressure.rec.Value 0.0000
 #-----------------------------------------------------------------------------
 pfset TopoSlopesX.Type                                "PFBFile"
 pfset TopoSlopesX.GeomNames                           "domain"
-pfset TopoSlopesX.FileName                            "LW.slopex.pfb"
+pfset TopoSlopesX.FileName                            "slopex.pfb"
 
 #-----------------------------------------------------------------------------
 # Topo slopes in y-direction
 #-----------------------------------------------------------------------------
 pfset TopoSlopesY.Type                                "PFBFile"
 pfset TopoSlopesY.GeomNames                           "domain"
-pfset TopoSlopesY.FileName                            "LW.slopey.pfb"
+pfset TopoSlopesY.FileName                            "slopey.pfb"
 
 #-----------------------------------------------------------------------------
 # Mannings coefficient
@@ -505,17 +517,14 @@ pfset Solver.Linear.Preconditioner                       PFMG
 #-----------------------------------------------------------------------------
 # Distribute inputs
 #-----------------------------------------------------------------------------
-pfdist -nz 1 LW.slopex.pfb
-pfdist -nz 1 LW.slopey.pfb
-
-pfdist IndicatorFile_Gleeson.50z.pfb
+pfdist -nz 1 slopex.pfb
+pfdist -nz 1 slopey.pfb
+pfdist indicatorfile.pfb
 pfdist press.init.pfb
 
 #-----------------------------------------------------------------------------
 # Run Simulation 
 #-----------------------------------------------------------------------------
-set runname "LW"
-puts $runname
 pfrun    $runname
 
 #-----------------------------------------------------------------------------
@@ -523,10 +532,8 @@ pfrun    $runname
 #-----------------------------------------------------------------------------
 pfundist $runname
 pfundist press.init.pfb
-pfundist LW.slopex.pfb
-pfundist LW.slopey.pfb
-pfundist IndicatorFile_Gleeson.50z.pfb
+pfundist slopex.pfb
+pfundist slopey.pfb
+pfundist indicatorfile.pfb
 
 puts "ParFlow run Complete"
-
-

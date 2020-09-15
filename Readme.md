@@ -56,16 +56,16 @@ Simulation
 
 ```
 cd washita/tcl_scripts
-tclsh LW_test.tcl
+./model.tcl <run_name>
 ```
 
-Converting ParFlow output to .nc files
---------------------
-Please follow the python notebook file: ```preprocess/write_nc.ipynb```
+This folder generates the folder `runs/<run_name>` with the simulation results.
 
 Training ConvLSTM model
 --------------------
-Please follow the python notebook file: ```new_NN_arch.ipynb```
+Execute they python file: ```nn.py```. This step requires you to point to the `runs/<run_name>` folder generated above
+as well as the path to the model tcl file (`model.tcl`). If not already present, an intermediate folder called
+`nc_files` is created inside the `runs/<run_name>` folder with the model `.nc` files.
 
 Contacts
 --------------------
