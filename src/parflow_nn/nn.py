@@ -14,13 +14,13 @@ from parflow_nn.preprocess_PF import create_feature_or_target_da
 from parflow_nn.write_nc import generate_nc_files, config as c
 
 
-if __name__ == '__main__':
+def main(args):
 
-    if len(sys.argv) < 2:
-        print('Usage: python nn.py <run_dir>')
-        sys.exit(0)
+    if len(args) < 1:
+        print('Required arguments: <run_dir>')
+        sys.exit(1)
 
-    run_dir, = sys.argv[1:]
+    run_dir, = args
     out_dir = generate_nc_files(run_dir)
 
     # Set GPU usage
@@ -284,3 +284,7 @@ if __name__ == '__main__':
     ])
 
     keras.utils.plot_model(new_model, to_file='model.png', show_shapes=True, show_layer_names=True)
+
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

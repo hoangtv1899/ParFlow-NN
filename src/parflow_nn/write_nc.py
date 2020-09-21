@@ -8,7 +8,7 @@ from parflow_nn.parsePF import init_arrays, init_arrays_with_pfbs, write_nc
 from parflow_nn import config
 
 
-def generate_nc_files(run_dir, overwrite=True):
+def generate_nc_files(run_dir, overwrite=False):
     print('Generating nc files ...')
     out_dir = os.path.join(run_dir, 'nc_files')
 

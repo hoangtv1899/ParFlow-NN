@@ -1,3 +1,5 @@
+![CI](https://github.com/hoangtv1899/ParFlow-NN/workflows/CI/badge.svg)
+
 ParFlow - NN
 =======
 
@@ -13,10 +15,16 @@ is the easiest option, **especially if you want GPU support**.
 Install [anaconda](https://www.anaconda.com/products/individual) or
 [miniconda](https://docs.conda.io/en/latest/miniconda.html) for your platform
 and then use the supplied `environment.yml` to create and activate the environment.
+Install the parflow-nn package inside this environment.
 ```
 conda env create -f environment.yml
 conda activate parflow_nn
+pip install -e .
 ```
+
+We recommend installing the `parflow-nn` package in `develop` mode (the `-e` flag in `pip install -e .`)
+while this package is actively under development, so that you can tweak your local copy of the code
+easily if you need to, and observe the changes.
 
 If you wish to leverage an available GPU, install the `tensorflow-gpu` package.
 ```
@@ -25,13 +33,16 @@ conda install tensorflow-gpu
 
 ### Virtualenv
 
-If you prefer to use `pip` in a `venv`, a `requirements.txt` is provided. Use this to
-create the virtual environment, activate it, and then install the dependencies.
+If you prefer to use `pip` in a `venv`, create the virtual environment, activate it, and then install the package.
 ```
 python3 -m venv env
 source env/bin/activate
-pip install -r requirements.txt
+pip install -e .
 ```
+
+We recommend installing the `parflow-nn` package in `develop` mode (the `-e` flag in `pip install -e .`)
+while this package is actively under development, so that you can tweak your local copy of the code
+easily if you need to, and observe the changes.
 
 If you wish to leverage an available GPU, first install and configure the
 [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) for your platform. You're most
@@ -63,9 +74,14 @@ This folder generates the folder `runs/<run_name>` with the simulation results.
 
 Training ConvLSTM model
 --------------------
-Execute they python file: ```nn.py```. This step requires you to point to the `runs/<run_name>` folder generated above
-as well as the path to the model tcl file (`model.tcl`). If not already present, an intermediate folder called
-`nc_files` is created inside the `runs/<run_name>` folder with the model `.nc` files.
+Execute the command:
+```
+python -m parflow_nn nn <run_dir>
+```
+
+This step requires you to point to the *run_directory*, i.e. the `runs/<run_name>` folder generated in the simulation
+step above. If not already present, an intermediate folder called `nc_files` is created inside the `runs/<run_name>`
+folder with the model `.nc` files.
 
 Contacts
 --------------------
