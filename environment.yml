@@ -23,4 +23,4 @@ dependencies:
   - pip:
     - cond-rnn
     - fire
-    - git+https://github.com/hoangtv1899/pfio.git
+    - parflowio

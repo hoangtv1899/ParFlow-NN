@@ -9,10 +9,10 @@ keras
 matplotlib
 netcdf4
 numpy<1.19.0
+parflowio
 pydot
 scipy==1.4.1
 seaborn
 tensorflow
 tqdm
 xarray
-git+https://github.com/vineetbansal/pfio.git
