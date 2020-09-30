@@ -31,6 +31,13 @@ def pfread(pfbfile):
 def parse_metadata(metadata_file):
 
     p = PFMetadata(metadata_file)
+
+    #add output data files
+    outputs = p.get_outputs()
+    output_data = {}
+    for key in outputs:
+        output_data[key], time_range = p.get_key_files(key)
+
     ic_pressure = p.icpressure_value() if p['ICPressure.Type'] == 'HydroStaticPatch' else p.icpressure_filename()
 
     return SimpleNamespace(
@@ -44,9 +51,6 @@ def parse_metadata(metadata_file):
         nx=p['ComputationalGrid.NX'],
         ny=p['ComputationalGrid.NY'],
         nz=p['ComputationalGrid.NZ'],
-        rain_len=p['Cycle.rainrec.rain.Length'],
-        rec_len=p['Cycle.rainrec.rec.Length'],
-        rain_val=p['Patch.z-upper.BCPressure.rain.Value'],
         indi_file=p.indicator_file(),
         icp_type=p['ICPressure.Type'],
         icp_ref_path=p.icpressure_refpatch(),
@@ -73,12 +77,12 @@ def parse_metadata(metadata_file):
             # but 'Mannings.Geom.domain.Value' (i.e. reversed)?
             mannings=p.get_values_by_geom('Mannings', is_reversed=True)
         )
-    )
+
+    ), output_data, p
 
 
 def init_arrays(metadata_file):
-    metadata_dir = os.path.dirname(metadata_file)
-    m = parse_metadata(metadata_file)
+    m, output_data, p = parse_metadata(metadata_file)
 
     indi_arr = pfread(m.indi_file)
 
@@ -119,8 +123,7 @@ def init_arrays(metadata_file):
                     icp_arr[zi, np.where(indi_arr[zi, :, :] > 0)] = -1 * (m.icp_file - sum_dz)
     else:
         icp_arr = pfread(m.icp_file)
-    
-    unit_rain_rec_len = [1] * int(m.rain_len) + [0] * int(m.rec_len)
+
     t_start0 = config.init.t0
     lat0 = np.arange(m.y0, m.y0 + m.ny * m.dy, m.dy)
     lon0 = np.arange(m.x0, m.x0 + m.nx * m.dx, m.dx)
@@ -135,28 +138,56 @@ def init_arrays(metadata_file):
             lev0.append(sum_depth)
         lev0 = np.array(lev0)
 
-    # get precip value
-    var_forc_arrays = []
-    time_arrays = []
-    output_files = sorted(glob(metadata_dir + '/*.out.press.*.pfb'))
-    for cci, filei in enumerate(output_files):
-        deltai = int(os.path.basename(filei).split('.')[-2])
-        if unit_rain_rec_len[deltai % len(unit_rain_rec_len)] == 1:
-            tmp_arr_forc = np.zeros((m.nz, m.ny, m.nx))
-            tmp_arr_forc[-1, :, :] = np.ones((m.ny, m.nx)) * m.rain_val
-        else:
-            tmp_arr_forc = np.zeros((m.nz, m.ny, m.nx))
-        var_forc_arrays.append(tmp_arr_forc)
-        time_arrays.append(t_start0 + timedelta(hours=deltai))
+    NLDAS_vars = ['DSWR', 'DLWR', 'APCP', 'Temp',
+                  'UGRD', 'VGRD', 'Press', 'SPFH']
 
-    var_outs = {'precip': var_forc_arrays, 'prev_press': icp_arr}
+    # get clm_forcing
+    if p.is_clm():
+        istart, ts_in_file, clm_name, clm_path, forcing_3d = p.get_clm_info()
+        if forcing_3d == '3D':
+            starti = ts_in_file * round(istart / ts_in_file) + 1
+            endi = ts_in_file * (round(time_range[-1] / ts_in_file) - 1) + 1
+            var_forc_arrays = []
+            for NLDAS_vari in NLDAS_vars:
+                timei_arr = []
+                for timei in range(starti, endi + 1, 24):
+                    timei_arr.append(
+                        pfread('%s/%s.%s.%06d_to_%06d.pfb' % (clm_path, clm_name, NLDAS_vari, timei, timei + 23)))
+                timei_arr = np.vstack(timei_arr)
+                var_forc_arrays.append(timei_arr)
+            var_forc_arrays = np.stack(var_forc_arrays)
+            var_forc_arrays = np.swapaxes(var_forc_arrays, 0, 1)
+            assert forcing_3d == '3D', 'Only 3D forcing are supported'
+        time_arrays = [t_start0 + timedelta(hours = x) for x in range(var_forc_arrays.shape[1])]
+    else:
+        rain_len = p['Cycle.rainrec.rain.Length'],
+        rec_len = p['Cycle.rainrec.rec.Length'],
+        rain_val = p['Patch.z-upper.BCPressure.rain.Value']
+        unit_rain_rec_len = [1] * int(m.rain_len) + [0] * int(m.rec_len)
+        # get precip value
+        var_forc_arrays = []
+        time_arrays = []
+        output_files = output_data['pressure']
+        for cci, filei in enumerate(output_files):
+            deltai = int(os.path.basename(filei).split('.')[-2])
+            if unit_rain_rec_len[deltai % len(unit_rain_rec_len)] == 1:
+                tmp_arr_forc = np.zeros((m.nz, m.ny, m.nx))
+                tmp_arr_forc[-1, :, :] = np.ones((m.ny, m.nx)) * m.rain_val
+            else:
+                tmp_arr_forc = np.zeros((m.nz, m.ny, m.nx))
+            var_forc_arrays.append(tmp_arr_forc)
+            time_arrays.append(t_start0 + timedelta(hours=deltai))
+
+    var_outs = {'forcings': var_forc_arrays, 'prev_press': icp_arr}
     var_outs.update(geom_data)
 
     return m.nx, m.ny, m.nz, m.dx, m.dy, m.dz, m.dz_scale, time_arrays, lat0, lon0, lev0, var_outs
 
 
-def init_arrays_with_pfbs(pfb_dir, keys=('press', 'satur')):
-    return {k: [pfread(file) for file in sorted(glob(pfb_dir + '/*.out.press.*.pfb'))] for k in keys}
+def init_arrays_with_pfbs(metadata_file):
+    _, output_data, p = parse_metadata(metadata_file)
+    #return {k: [pfread(file) for file in sorted(glob(pfb_dir + '/*.out.press.*.pfb'))] for k in keys}
+    return np.stack([pfread(file) for file in output_data])
 
 
 def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, islev=True):
@@ -177,7 +208,7 @@ def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, islev=
         lon.units = 'degrees_east'
         lon.long_name = 'longitude'
         lev = f.createVariable('lev', np.float64, ('lev',))
-        lev.units = 'depth from the surface (m)'
+        #lev.units = 'depth from the surface (m)'
         lev.long_name = 'level'
         time = f.createVariable('time', np.float64, ('time',))
         time.units = 'hours since ' + config.init.t0.strftime('%Y-%m-%d')

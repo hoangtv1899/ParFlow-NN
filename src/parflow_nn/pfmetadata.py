@@ -60,6 +60,33 @@ class PFMetadata:
             if self[f'GeomInput.{geom}.InputType'] == typ:
                 return geom
 
+    def get_outputs(self):
+        return list(self.config['outputs'].keys())
+
+    def get_key_files(self, key):
+        out_dict = self.config['outputs'][key]['data'][0]
+        output_list = []
+        for timei in range(out_dict['time-range'][0], out_dict['time-range'][1] + 1):
+            output_list.append(self.get_absolute_path(out_dict['file-series'] % (timei)))
+        return output_list, out_dict['time-range']
+
+    def is_clm(self):
+        if self['Solver.LSM'] == 'CLM':
+            return True
+        else:
+            return False
+
+    def get_clm_info(self):
+        istart = int(self['Solver.CLM.IstepStart'])
+        ts_in_file = int(self['Solver.CLM.MetFileNT'])
+        clm_name = self['Solver.CLM.MetFileName']
+        clm_path = self.get_absolute_path(self['Solver.CLM.MetFilePath'])
+        if self['Solver.CLM.MetForcing'] == '3D':
+            forcing_3d = True
+        else:
+            forcing_3d = False
+        return istart, ts_in_file, clm_name, clm_path, forcing_3d
+
     def dz_scale(self):
         if self['Solver.Nonlinear.VariableDz']:
             return self.nz_list('dzScale')

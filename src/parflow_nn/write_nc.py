@@ -24,29 +24,32 @@ def generate_nc_files(run_dir, overwrite=False):
     metadata_file = os.path.join(run_dir, f'{run_name}.out.pfmetadata')
     nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file)
 
-    new_precip_arr = np.stack([p[-1, ...] for p in var_outs['precip']])
-    del var_outs['precip']
+    new_forcing_arr = np.stack([p[-1, ...] for p in var_outs['forcings']])
+    del var_outs['forcings']
 
-    out_nc = os.path.join(out_dir, f'{run_name}_precip.nc')
+    out_nc = os.path.join(out_dir, f'{run_name}_forcings.nc')
     write_nc(out_nc, nx, ny, 1, lat0, lon0, np.array([0]), time_arrays,
-             {'precip': new_precip_arr.reshape(-1, 1, ny, nx)})
+             {'forcings': new_forcing_arr.reshape(-1, 1, ny, nx)})
 
     out_nc = os.path.join(out_dir, f'{run_name}_static.nc')
     write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, [config.init.t0], var_outs)
 
-    target_arrs = init_arrays_with_pfbs(run_dir)
+    target_arrs = init_arrays_with_pfbs(metadata_file)
 
     out_nc = os.path.join(out_dir, f'{run_name}_press.nc')
-    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'press': target_arrs['press']})
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'press': target_arrs['pressure']})
 
     out_nc = os.path.join(out_dir, f'{run_name}_satur.nc')
-    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'satur': target_arrs['satur']})
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'satur': target_arrs['saturation']})
+
+    out_nc = os.path.join(out_dir, f'{run_name}_clm.nc')
+    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'clm': target_arrs['clm_output']})
 
     out_nc = os.path.join(out_dir, f'{run_name}_prev_press.nc')
     write_nc(
         out_nc, nx, ny, nz, lat0, lon0, lev0,
         [x - timedelta(hours=1) for x in time_arrays],
-        {'prev_press': [var_outs['prev_press']] + target_arrs['press'][:-1]}
+        {'prev_press': [var_outs['prev_press']] + target_arrs['pressure'][:-1]}
     )
 
     return out_dir
