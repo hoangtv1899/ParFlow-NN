@@ -78,11 +78,11 @@ def parse_metadata(metadata_file):
             mannings=p.get_values_by_geom('Mannings', is_reversed=True)
         )
 
-    ), output_data, p
+    ), output_data, time_range, p
 
 
 def init_arrays(metadata_file):
-    m, output_data, p = parse_metadata(metadata_file)
+    m, output_data, time_range, p = parse_metadata(metadata_file)
 
     indi_arr = pfread(m.indi_file)
 
@@ -142,12 +142,13 @@ def init_arrays(metadata_file):
                   'UGRD', 'VGRD', 'Press', 'SPFH']
 
     # get clm_forcing
+    var_forc_arrays = []
+    time_arrays = []
     if p.is_clm():
         istart, ts_in_file, clm_name, clm_path, forcing_3d = p.get_clm_info()
-        if forcing_3d == '3D':
+        if forcing_3d == True:
             starti = ts_in_file * round(istart / ts_in_file) + 1
             endi = ts_in_file * (round(time_range[-1] / ts_in_file) - 1) + 1
-            var_forc_arrays = []
             for NLDAS_vari in NLDAS_vars:
                 timei_arr = []
                 for timei in range(starti, endi + 1, 24):
@@ -157,16 +158,14 @@ def init_arrays(metadata_file):
                 var_forc_arrays.append(timei_arr)
             var_forc_arrays = np.stack(var_forc_arrays)
             var_forc_arrays = np.swapaxes(var_forc_arrays, 0, 1)
-            assert forcing_3d == '3D', 'Only 3D forcing are supported'
-        time_arrays = [t_start0 + timedelta(hours = x) for x in range(var_forc_arrays.shape[1])]
+            assert forcing_3d == True, 'Only 3D forcing are supported'
+            time_arrays = [t_start0 + timedelta(hours = x) for x in range(var_forc_arrays.shape[0])]
     else:
         rain_len = p['Cycle.rainrec.rain.Length'],
         rec_len = p['Cycle.rainrec.rec.Length'],
         rain_val = p['Patch.z-upper.BCPressure.rain.Value']
         unit_rain_rec_len = [1] * int(m.rain_len) + [0] * int(m.rec_len)
         # get precip value
-        var_forc_arrays = []
-        time_arrays = []
         output_files = output_data['pressure']
         for cci, filei in enumerate(output_files):
             deltai = int(os.path.basename(filei).split('.')[-2])
@@ -185,9 +184,9 @@ def init_arrays(metadata_file):
 
 
 def init_arrays_with_pfbs(metadata_file):
-    _, output_data, p = parse_metadata(metadata_file)
+    _, output_data, _, _ = parse_metadata(metadata_file)
     #return {k: [pfread(file) for file in sorted(glob(pfb_dir + '/*.out.press.*.pfb'))] for k in keys}
-    return np.stack([pfread(file) for file in output_data])
+    return {key: np.stack([pfread(file) for file in output_data[key]]) for key in output_data}
 
 
 def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, islev=True):

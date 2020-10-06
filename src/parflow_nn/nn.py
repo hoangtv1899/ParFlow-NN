@@ -11,7 +11,8 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 
 from parflow_nn.losses import log_loss, rmse, var_loss, var_ratio, metrics
 from parflow_nn.preprocess_PF import create_feature_or_target_da
-from parflow_nn.write_nc import generate_nc_files, config as c
+from parflow_nn.write_nc import generate_nc_files
+from parflow_nn.config import Config
 
 
 def main(args):
@@ -20,8 +21,15 @@ def main(args):
         print('Required arguments: <run_dir>')
         sys.exit(1)
 
-    run_dir, = args
+
+    c = Config('parflownn', 'parflow_nn/config.ini')
+
+
+    run_dir, is_clm = args
     out_dir = generate_nc_files(run_dir)
+
+    if is_clm is None:
+        is_clm = False
 
     # Set GPU usage
     config = tf.compat.v1.ConfigProto()
@@ -30,25 +38,38 @@ def main(args):
 
     run_name = os.path.basename(run_dir)
     static_file = os.path.join(out_dir, f'{run_name}_static.nc')
-    precip_file = os.path.join(out_dir, f'{run_name}_precip.nc')
+    forcing_file = os.path.join(out_dir, f'{run_name}_forcings.nc')
     prev_press_file = os.path.join(out_dir, f'{run_name}_prev_press.nc')
     target_satur_file = os.path.join(out_dir, f'{run_name}_satur.nc')
     target_press_file = os.path.join(out_dir, f'{run_name}_press.nc')
 
+    if is_clm:
+        target_clm_file = os.path.join(out_dir, f'{run_name}_clm.nc')
+
     # Forcing data
-    forcing_input = xr.open_dataset(precip_file)
+    forcing_input = xr.open_dataset(forcing_file)
+
     forcing_feature_da, forcing_feature_names = create_feature_or_target_da(
         forcing_input,
-        ['precip'],
+        ['forcings'],
         0,
         'feature',
         flx_same_dt=True
     )
 
     # Add channel dimension
-    forcing_feature_da = forcing_feature_da.data[:, 0, :, :]
-    forcing_feature_da = forcing_feature_da[..., np.newaxis]
-    forcing_feature_da = forcing_feature_da[np.newaxis, ...]
+    if is_clm:
+        forcing_feature_da = forcing_feature_da.data[:]
+        forcing_feature_da = np.swapaxes(forcing_feature_da, 1, 2)
+        forcing_feature_da = np.swapaxes(forcing_feature_da, 2, 3)
+        forcing_feature_da = np.repeat(forcing_feature_da,
+                               repeats=[2] + [1] * (forcing_feature_da.shape[0] - 1),
+                               axis=0)  # duplicate the first row
+        forcing_feature_da = forcing_feature_da[np.newaxis, ...]
+    else:
+        forcing_feature_da = forcing_feature_da.data[:, 0, :, :]
+        forcing_feature_da = forcing_feature_da[..., np.newaxis]
+        forcing_feature_da = forcing_feature_da[np.newaxis, ...]
 
     # Static inputs
     static_input_xr = xr.open_dataset(static_file)
@@ -99,17 +120,28 @@ def main(args):
 
     target_press_input_xr = xr.open_dataset(target_press_file)
     target_satur_input_xr = xr.open_dataset(target_satur_file)
-    target_dataset = target_press_input_xr.merge(target_satur_input_xr)
-    target_da, target_names = create_feature_or_target_da(
-        target_dataset,
-        ['press', 'satur'],
-        0,
-        'target',
-        1,
-        flx_same_dt=True
-    )
+    if is_clm:
+        target_clm_input_xr = xr.open_dataset(target_clm_file)
+        target_clm = np.repeat(target_clm_input_xr.clm,
+                               repeats=[2]+[1]*(target_clm_input_xr.clm.shape[0] - 1),
+                               axis=0) #duplicate the first row
+        target_da = np.concatenate([target_press_input_xr.press,
+                            target_satur_input_xr.satur,
+                            target_clm], axis = 1)
+        target_da = target_da[np.newaxis, ...]
+    else:
+        target_dataset = target_press_input_xr.merge(target_satur_input_xr)
+        target_da, target_names = create_feature_or_target_da(
+            target_dataset,
+            ['press', 'satur'],
+            0,
+            'target',
+            1,
+            flx_same_dt=True
+        )
 
-    target_da = target_da.data[np.newaxis, ...]
+        target_da = target_da.data[np.newaxis, ...]
+
     target_da = np.swapaxes(target_da, 2, 3)
     target_da = np.swapaxes(target_da, 3, 4)
 
@@ -239,6 +271,7 @@ def main(args):
 
     # Fit model
     t = c.nn.train_timesteps
+    t = 5
     subset_target = target_da[:, :t, :, :, :]
     final_model.fit(
             x=[new_static_feature_da[:, :t, :, :, :],
