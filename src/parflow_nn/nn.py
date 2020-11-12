@@ -26,7 +26,7 @@ def main(args):
 
 
     run_dir, is_clm = args
-    out_dir = generate_nc_files(run_dir)
+    out_dir = generate_nc_files(run_dir, overwrite = True)
 
     if is_clm is None:
         is_clm = False
