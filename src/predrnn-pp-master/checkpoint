@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 model_checkpoint_path: "/glade/scratch/hoangtran/ParFlow-NN/src/predrnn-pp-master/model1.ckpt-500"
 all_model_checkpoint_paths: "/glade/scratch/hoangtran/ParFlow-NN/src/predrnn-pp-master/model1.ckpt-3000"
 all_model_checkpoint_paths: "/glade/scratch/hoangtran/ParFlow-NN/src/predrnn-pp-master/model1.ckpt-500"
+=======
+model_checkpoint_path: "predrnn_model.tf"
+all_model_checkpoint_paths: "predrnn_model.tf"
+>>>>>>> merge from verde

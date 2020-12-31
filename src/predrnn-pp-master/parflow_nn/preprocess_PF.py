@@ -13,7 +13,10 @@ import os
 import sys
 import xarray as xr
 import numpy as np
+<<<<<<< HEAD
 from configargparse import ArgParser
+=======
+>>>>>>> merge from verde
 from datetime import datetime
 from subprocess import getoutput
 import timeit
@@ -498,6 +501,7 @@ def main(inargs):
     print('Total time: %.2f s' % (t2 - t1))
 
 
+<<<<<<< HEAD
 if __name__ == '__main__':
     p = ArgParser()
     p.add('--config_file',
@@ -588,3 +592,5 @@ if __name__ == '__main__':
     p.set_defaults(verbose=False)
     args = p.parse_args()
     main(args)
+=======
+>>>>>>> merge from verde

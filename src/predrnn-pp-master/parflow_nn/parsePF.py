@@ -22,7 +22,11 @@ def pfread(pfbfile):
     pfb_data = PFData(pfbfile)
     pfb_data.loadHeader()
     pfb_data.loadData()
+<<<<<<< HEAD
     arr = pfb_data.getDataAsArray()
+=======
+    arr = pfb_data.moveDataArray()
+>>>>>>> merge from verde
     pfb_data.close()
     assert arr.ndim == 3, 'Only 3D arrays are supported'
     return np.flip(arr, axis=1)

@@ -3,9 +3,15 @@
 Author: Stephan Rasp
 """
 
+<<<<<<< HEAD
 import keras
 import keras.backend as K
 from keras.losses import mse
+=======
+import tensorflow.keras as keras
+import tensorflow.keras.backend as K
+from tensorflow.keras.losses import mse
+>>>>>>> merge from verde
 
 
 # Define custom losses

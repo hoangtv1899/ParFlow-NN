@@ -7,6 +7,7 @@ networks_map = {'predrnn_pp': predrnn_pp.rnn,
 
 def construct_model(name, images, targets, num_layers, num_hidden,
                     filter_size, stride, seq_length, tln):
+<<<<<<< HEAD
     '''Returns a sequence of generated frames
     Args:
         name: [predrnn_pp]
@@ -23,6 +24,8 @@ def construct_model(name, images, targets, num_layers, num_hidden,
     Raises:
         ValueError: If network `name` is not recognized.
     '''
+=======
+>>>>>>> merge from verde
     if name not in networks_map:
         raise ValueError('Name of network unknown %s' % name)
     func = networks_map[name]
