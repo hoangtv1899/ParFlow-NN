@@ -13,10 +13,6 @@ import os
 import sys
 import xarray as xr
 import numpy as np
-<<<<<<< HEAD
-from configargparse import ArgParser
-=======
->>>>>>> merge from verde
 from datetime import datetime
 from subprocess import getoutput
 import timeit
@@ -501,96 +497,3 @@ def main(inargs):
     print('Total time: %.2f s' % (t2 - t1))
 
 
-<<<<<<< HEAD
-if __name__ == '__main__':
-    p = ArgParser()
-    p.add('--config_file',
-          default='config.yml',
-          is_config_file=True,
-          help='Name of config file in this directory. '
-               'Must contain feature and target variable lists.')
-    p.add_argument('--inputs',
-                   type=str,
-                   nargs='+',
-                   help='Feature variables')
-    p.add_argument('--outputs',
-                   type=str,
-                   nargs='+',
-                   help='Target variables')
-    p.add_argument('--in_dir',
-                   type=str,
-                   nargs='+',
-                   help='Directory with input (aqua) files.')
-    p.add_argument('--out_dir',
-                   type=str,
-                   help='Directory to write preprocessed file.')
-    p.add_argument('--aqua_names',
-                   type=str,
-                   nargs='+',
-                   help='String with filenames to be processed.')
-    p.add_argument('--out_pref',
-                   type=str,
-                   default='test',
-                   help='Prefix for all file names')
-    p.add_argument('--chunk_size',
-                   type=int,
-                   default=100_000,
-                   help='size of chunks')
-    p.add_argument('--ext_norm',
-                   type=str,
-                   default=None,
-                   help='Name of external normalization file')
-    p.add_argument('--min_lev',
-                   type=int,
-                   default=0,
-                   help='Minimum level index. Default = 0')
-    p.add_argument('--crop',
-                   type=int,
-                   default=0,
-                   help='Crop dataset. Default = 0')
-    p.add_argument('--lat_range',
-                   type=int,
-                   nargs='+',
-                   default=[-90, 90],
-                   help='Latitude range. Default = [-90, 90]')
-    p.add_argument('--target_factor',
-                   type=float,
-                   default=1.,
-                   help='Factor to multiply targets with. For TF comparison '
-                        'set to 1e-3. Default = 1.')
-    p.add_argument('--random_seed',
-                   type=int,
-                   default=42,
-                   help='Random seed for shuffling of data.')
-    p.add_argument('--shuffle',
-                   dest='shuffle',
-                   action='store_true',
-                   help='If given, shuffle data along sample dimension.')
-    p.set_defaults(shuffle=False)
-    p.add_argument('--only_norm',
-                   dest='only_norm',
-                   action='store_true',
-                   help='If given, only compute and save normalization file.')
-    p.set_defaults(only_norm=False)
-    p.add_argument('--flx_same_dt',
-                   dest='flx_same_dt',
-                   action='store_true',
-                   help='If given, take surface fluxes from same time step.')
-    p.set_defaults(flx_same_dt=False)
-    p.add_argument('--norm_features',
-                   type=str,
-                   default=None,
-                   help='by_var or by_lev')
-    p.add_argument('--norm_targets',
-                   type=str,
-                   default=None,
-                   help='norm or scale')
-    p.add_argument('--verbose',
-                   dest='verbose',
-                   action='store_true',
-                   help='If given, print debugging information.')
-    p.set_defaults(verbose=False)
-    args = p.parse_args()
-    main(args)
-=======
->>>>>>> merge from verde
