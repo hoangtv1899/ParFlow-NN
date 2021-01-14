@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='parflow-nn',
-    version='0.0.1',
+    version='0.0.2',
     packages=['parflow_nn'],
     package_dir={'': 'src'},
     package_data={'parflow_nn': ['config.ini']},
