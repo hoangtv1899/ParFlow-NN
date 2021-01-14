@@ -23,4 +23,4 @@ dependencies:
   - pip:
     - cond-rnn
     - fire
-    - parflowio
+    - parflowio>=0.0.4

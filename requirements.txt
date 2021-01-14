@@ -9,7 +9,7 @@ keras
 matplotlib
 netcdf4
 numpy<1.19.0
-parflowio
+parflowio>=0.0.4
 pydot
 scipy==1.4.1
 seaborn
