@@ -1,7 +1,8 @@
 __author__ = 'yunbo'
 
 import tensorflow as tf
-from layers.TensorLayerNorm import tensor_layer_norm
+from parflow_nn.layers.TensorLayerNorm import tensor_layer_norm
+
 
 class GHU(tf.keras.layers.Layer):
     def __init__(self, layer_name, filter_size, num_features, tln=False,
