@@ -8,16 +8,17 @@ from parflow_nn.preprocess_PF import create_feature_or_target_da
 from parflow_nn.predpp import PredPP
 
 
-def train_step(model, input, init_stat, target, learning_rate):
+def train_step(model, input, target, learning_rate):
     # prediction = model(input, training=True)
 
     loss_func = tf.keras.losses.MeanSquaredError()
 
     with tf.GradientTape() as ae_tape:
-        # prediction = model({'images':input, 'init_mem':init_stat})
         prediction = model(input)
+        
         # Calculate loss
         loss = loss_func(target[:, 1:], prediction)
+        assert loss.ndim > 0, "Model predicts NaN"
     # Get the encoder and decoder variables
     trainable_vars = model.trainable_variables
     # Calculate gradient
@@ -250,12 +251,12 @@ if __name__ == '__main__':
     # --------------------------------------------------
     t0 = time.time()
     for ii in range(51):
-        loss, ae_optimizer = train_step(model, ims, new_static_feature_da, tars, 1e-2)
+        loss, ae_optimizer = train_step(model, ims, tars, 1e-2)
 
         if reverse_input:
             ims_rev = ims[:, ::-1]
             tars_rev = tars[:, ::-1]
-            tmp_loss, _ = train_step(model, ims_rev, new_static_feature_da, tars_rev, 1e-2)
+            tmp_loss, _ = train_step(model, ims_rev, tars_rev, 1e-2)
             loss += tmp_loss
             loss = loss / 2
         if ii % 1 == 0:
