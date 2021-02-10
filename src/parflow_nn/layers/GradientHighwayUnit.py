@@ -46,7 +46,6 @@ class GHU(tf.keras.layers.Layer):
         
         return config
     
-    @tf.function
     def init_state(self, inputs, num_features):
         dims = inputs.get_shape().ndims
         if dims == 4:
@@ -55,7 +54,7 @@ class GHU(tf.keras.layers.Layer):
             width = inputs.get_shape()[2]
         else:
             raise ValueError('input tensor should be rank 4.')
-        return tf.zeros([batch, height, width, num_features], dtype=tf.float32)
+        return tf.zeros((batch, height, width, num_features))
     
     def __call__(self, x, z):
         if z is None:

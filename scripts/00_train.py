@@ -8,16 +8,17 @@ from parflow_nn.preprocess_PF import create_feature_or_target_da
 from parflow_nn.predpp import PredPP
 
 
-def train_step(model, input, init_stat, target, learning_rate):
+def train_step(model, input, target, learning_rate):
     # prediction = model(input, training=True)
 
     loss_func = tf.keras.losses.MeanSquaredError()
 
     with tf.GradientTape() as ae_tape:
-        # prediction = model({'images':input, 'init_mem':init_stat})
         prediction = model(input)
+        
         # Calculate loss
         loss = loss_func(target[:, 1:], prediction)
+        assert loss.ndim > 0, "Model predicts NaN"
     # Get the encoder and decoder variables
     trainable_vars = model.trainable_variables
     # Calculate gradient
@@ -96,58 +97,6 @@ def normalize_feature_da(feature_da, feature_names=None):
 if __name__ == '__main__':
 
     # --------------------------------------------------
-    # FLAGS
-    # --------------------------------------------------
-    FLAGS = tf.compat.v1.app.flags.FLAGS
-
-    # model
-    tf.compat.v1.app.flags.DEFINE_string('model_name', 'predrnn_pp',
-                                         'The name of the architecture.')
-    """
-    tf.compat.v1.app.flags.DEFINE_string('pretrained_model', '/home/hvtran/ParFlow-NN/predrnn_pretrained/',
-                               'file of a pretrained model to initialize from.')
-    tf.compat.v1.app.flags.DEFINE_string('pretrained_model_meta', '/home/hvtran/ParFlow-NN/predrnn_pretrained/model1.ckpt-300.meta',
-                               'file of a pretrained model metadata file to initialize from.')
-    """
-    tf.compat.v1.app.flags.DEFINE_string('pretrained_model', '',
-                                         'file of a pretrained model to initialize from.')
-    tf.compat.v1.app.flags.DEFINE_string('pretrained_model_meta', '',
-                                         'file of a pretrained model metadata file to initialize from.')
-    tf.compat.v1.app.flags.DEFINE_integer('seq_length', 24,
-                                          'total input and output length.')
-    tf.compat.v1.app.flags.DEFINE_integer('img_width', 41,
-                                          'input image width.')
-    tf.compat.v1.app.flags.DEFINE_integer('img_channel', 8,
-                                          'number of image channel.')
-    tf.compat.v1.app.flags.DEFINE_integer('target_channel', 123,
-                                          'number of target channel.')
-    tf.compat.v1.app.flags.DEFINE_integer('stride', 1,
-                                          'stride of a convlstm layer.')
-    tf.compat.v1.app.flags.DEFINE_integer('filter_size', 5,
-                                          'filter of a convlstm layer.')
-    tf.compat.v1.app.flags.DEFINE_string('num_hidden', '8,16,32,64,64,64,64,64,48',
-                                         'COMMA separated number of units in a convlstm layer.')
-    tf.compat.v1.app.flags.DEFINE_integer('patch_size', 1,
-                                          'patch size on one dimension.')
-    tf.compat.v1.app.flags.DEFINE_boolean('layer_norm', True,
-                                          'whether to apply tensor layer norm.')
-    # optimization
-    tf.compat.v1.app.flags.DEFINE_float('lr', 0.001,
-                                        'base learning rate.')
-    tf.compat.v1.app.flags.DEFINE_boolean('reverse_input', True,
-                                          'whether to reverse the input frames while training.')
-    tf.compat.v1.app.flags.DEFINE_integer('batch_size', 1,
-                                          'batch size for training.')
-    tf.compat.v1.app.flags.DEFINE_integer('max_iterations', 300,
-                                          'max num of steps.')
-    tf.compat.v1.app.flags.DEFINE_integer('display_interval', 1,
-                                          'number of iters showing training loss.')
-    tf.compat.v1.app.flags.DEFINE_integer('test_interval', 2000,
-                                          'number of iters for test.')
-    tf.compat.v1.app.flags.DEFINE_integer('snapshot_interval', 10000,
-                                          'number of iters saving models.')
-
-    # --------------------------------------------------
     is_clm = True
     NC_DIR = 'nc_files'
     static_input = xr.open_dataset(os.path.join(NC_DIR, 'static.nc'))
@@ -157,12 +106,12 @@ if __name__ == '__main__':
     if is_clm:
         target_clm_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'clm.nc'))
 
-    lr = FLAGS.lr
     num_hidden = [16, 16, 32, 32, 64, 64, 128, 128, 128, 48]
     num_layers = len(num_hidden)
     delta = 0.00002
     base = 0.99998
     eta = 1
+    filter_size = 5
     reverse_input = True
     # --------------------------------------------------
 
@@ -288,7 +237,7 @@ if __name__ == '__main__':
     model = tf.keras.models.Sequential()
     mylayer = PredPP(ims.get_shape().as_list(), tars.shape[4],
                      num_layers, num_hidden,
-                     FLAGS.filter_size,
+                     filter_size,
                      ims.shape[1],
                      True,
                      init_mem=new_static_feature_da
@@ -302,12 +251,12 @@ if __name__ == '__main__':
     # --------------------------------------------------
     t0 = time.time()
     for ii in range(51):
-        loss, ae_optimizer = train_step(model, ims, new_static_feature_da, tars, 1e-2)
+        loss, ae_optimizer = train_step(model, ims, tars, 1e-2)
 
         if reverse_input:
             ims_rev = ims[:, ::-1]
             tars_rev = tars[:, ::-1]
-            tmp_loss, _ = train_step(model, ims_rev, new_static_feature_da, tars_rev, 1e-2)
+            tmp_loss, _ = train_step(model, ims_rev, tars_rev, 1e-2)
             loss += tmp_loss
             loss = loss / 2
         if ii % 1 == 0:

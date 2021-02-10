@@ -57,15 +57,16 @@ class PredPP(tf.keras.layers.Layer):
             self.lstm.append(self.new_cell)
             self.cell.append(None)
             self.hidden.append(None)
+        init_mem = self.init_mem
+        if init_mem is not None:
+            self.mobile_net = tf.keras.applications.MobileNet(
+                input_shape=(input_shape[2], input_shape[3], 3),
+                include_top=False,
+                weights=os.path.join(os.path.dirname(parflow_nn.__file__), 'data', 'mobilenet_1_0_224_tf_no_top.h5')
+            )
 
-        self.mobile_net = tf.keras.applications.MobileNet(
-            input_shape=(input_shape[2], input_shape[3], 3),
-            include_top=False,
-            weights=os.path.join(os.path.dirname(parflow_nn.__file__), 'data', 'mobilenet_1_0_224_tf_no_top.h5')
-        )
-
-        for layer in self.mobile_net.layers:
-            layer.trainable = False
+            for layer in self.mobile_net.layers:
+                layer.trainable = False
 
     def call(self, input):
         images = input
@@ -83,7 +84,7 @@ class PredPP(tf.keras.layers.Layer):
         else:
             mem = None
 
-        z_t = tf.zeros((1, 41, 41, 16))
+        z_t = None
         for t in range(self.seq_length - 1):
             inputs = images[:, t]
 
