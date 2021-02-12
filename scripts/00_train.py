@@ -96,14 +96,13 @@ if __name__ == '__main__':
     TRAIN_HOURS = 24 * 1
     
     # --------------------------------------------------
+    
     is_clm = True
     NC_DIR = '/home/hvtran/washita_clm/nc_files'
     static_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_static.nc'))
     forcing_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_forcings.nc'))
-    target_press_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_press.nc'))
-    target_satur_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_satur.nc'))
-    if is_clm:
-        target_clm_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_clm.nc'))
+    target_flow_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_flow.nc'))
+    target_wtd_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_wtd.nc'))
 
     num_hidden = [16, 16, 32, 48, 64, 128, 256, 256, 256, 256, 128, 48]
     num_layers = len(num_hidden)
@@ -112,6 +111,7 @@ if __name__ == '__main__':
     eta = 1
     reverse_input = True
     filter_size = 5
+    
     # --------------------------------------------------
 
     # TODO: The second argument is simply first_argument.data_vars.keys()
@@ -177,30 +177,15 @@ if __name__ == '__main__':
     # TARGETS
     # ---------------------------------------------
 
-    if is_clm:
-        target_clm = np.repeat(target_clm_input_xr.clm,
-                               repeats=[2] + [1] * (target_clm_input_xr.clm.shape[0] - 1),
-                               axis=0)  # duplicate the first row
-        target_da = np.concatenate([target_press_input_xr.press,
-                                    target_satur_input_xr.satur,
-                                    target_clm], axis=1)
-        target_da = target_da[np.newaxis, ...]
-    else:
-        target_dataset = target_press_input_xr.merge(target_satur_input_xr)
-        target_da, target_names = create_feature_or_target_da(
-            target_dataset,
-            ['press', 'satur'],
-            0,
-            'target',
-            1,
-            flx_same_dt=True
-        )
+    target_da = np.concatenate([target_flow_input_xr.flow,
+                            target_wtd_input_xr.wtd], axis=1)
+    target_da = target_da[np.newaxis, ...]
 
-        target_da = target_da.data[np.newaxis, ...]
 
     target_da = np.swapaxes(target_da, 2, 3)
     target_da = np.swapaxes(target_da, 3, 4)
     print(target_da.shape)  # 1, 8761, 41, 41, 123
+    
     
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
@@ -242,7 +227,7 @@ if __name__ == '__main__':
     # TRAIN
     # --------------------------------------------------
     t0 = time.time()
-    lr = 1e-2
+    lr = 1e-3
     for ii in range(100):
         loss, ae_optimizer = train_step(model, ims, tars, lr)
 
