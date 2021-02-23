@@ -2,7 +2,7 @@ import tensorflow as tf
 
 EPSILON = 0.00001
 
-@tf.function
+@tf.function()
 def tensor_layer_norm(x, state_name):
     x_shape = x.get_shape()
     dims = x_shape.ndims

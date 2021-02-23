@@ -21,11 +21,30 @@ def train_step(model, input, target, learning_rate):
     # Calculate gradient
     ae_grads = ae_tape.gradient(loss, trainable_vars)
     # And then apply the gradient to change the weights
-    ae_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    ae_optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     ae_optimizer.apply_gradients(zip(ae_grads, trainable_vars))
 
     # Loss is returned to monitor it while training
     return loss, ae_optimizer
+
+@tf.function
+def reshape_patch_back(patch_tensor, patch_size):
+    batch_size = np.shape(patch_tensor)[0]
+    seq_length = np.shape(patch_tensor)[1]
+    patch_height = np.shape(patch_tensor)[2]
+    patch_width = np.shape(patch_tensor)[3]
+    channels = np.shape(patch_tensor)[4]
+    img_channels = int(channels / (patch_size*patch_size))
+    a = tf.reshape(patch_tensor, [batch_size, seq_length,
+                                  patch_height, patch_width,
+                                  patch_size, patch_size,
+                                  img_channels])
+    b = tf.transpose(a, [0,1,2,4,3,5,6])
+    img_tensor = tf.reshape(b, [batch_size, seq_length,
+                                patch_height * patch_size,
+                                patch_width * patch_size,
+                                img_channels])
+    return img_tensor
 
 @tf.function
 def reshape_patch(img_tensor, patch_size):
@@ -104,7 +123,7 @@ if __name__ == '__main__':
     target_flow_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_flow.nc'))
     target_wtd_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_wtd.nc'))
 
-    num_hidden = [16, 16, 32, 48, 64, 128, 256, 256, 256, 256, 128, 48]
+    num_hidden = [1028]*8
     num_layers = len(num_hidden)
     delta = 0.00002
     base = 0.99998
@@ -177,8 +196,7 @@ if __name__ == '__main__':
     # TARGETS
     # ---------------------------------------------
 
-    target_da = np.concatenate([target_flow_input_xr.flow,
-                            target_wtd_input_xr.wtd], axis=1)
+    target_da = np.concatenate([target_flow_input_xr.flow], axis=1)
     target_da = target_da[np.newaxis, ...]
 
 
@@ -189,6 +207,8 @@ if __name__ == '__main__':
     
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
+    # Trim to get dimension of 40 by 40
+    TRAIN_HOURS = 24 * 14
     forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, :]
     target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
     new_static_feature_da = new_static_feature_da[:, :40, :40, :]
@@ -197,7 +217,7 @@ if __name__ == '__main__':
     target_norm_train = normalize_feature_da(target_train)
 
     t0 = time.time()
-    patch_size = tf.Variable(1)
+    patch_size = tf.Variable(10)
     ims = reshape_patch(forcing_norm_train, patch_size)
     tars = reshape_patch(target_norm_train, patch_size)
     #tars = tars[:, :, :, :, :50]
@@ -208,7 +228,7 @@ if __name__ == '__main__':
     # OPTIMIZER AND LOSS FUNCTION
     # --------------------------------------------------
     # Optimizer and loss function
-    ae_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
+    ae_optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-3)
     # MSE works here best
     loss_func = tf.keras.losses.MeanSquaredError()
 
@@ -227,7 +247,7 @@ if __name__ == '__main__':
     # TRAIN
     # --------------------------------------------------
     t0 = time.time()
-    lr = 1e-3
+    lr = 1e-4
     for ii in range(100):
         loss, ae_optimizer = train_step(model, ims, tars, lr)
 
