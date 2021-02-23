@@ -112,7 +112,7 @@ def normalize_feature_da(feature_da, feature_names=None):
 if __name__ == '__main__':
     # --------------------- CONSTANTS ------------------
     
-    TRAIN_HOURS = 24 * 1
+    TRAIN_HOURS = 24 * 14
     
     # --------------------------------------------------
     
@@ -208,7 +208,6 @@ if __name__ == '__main__':
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
     # Trim to get dimension of 40 by 40
-    TRAIN_HOURS = 24 * 14
     forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, :]
     target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
     new_static_feature_da = new_static_feature_da[:, :40, :40, :]
