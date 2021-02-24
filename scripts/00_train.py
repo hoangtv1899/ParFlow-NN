@@ -7,7 +7,6 @@ import tensorflow as tf
 from parflow_nn.preprocess_PF import create_feature_or_target_da
 from parflow_nn.predpp import PredPP
 
-
 def train_step(model, input, target, learning_rate):
     # prediction = model(input, training=True)
 
@@ -15,21 +14,37 @@ def train_step(model, input, target, learning_rate):
 
     with tf.GradientTape() as ae_tape:
         prediction = model(input)
-        
         # Calculate loss
         loss = loss_func(target[:, 1:], prediction)
-        assert loss.ndim > 0, "Model predicts NaN"
     # Get the encoder and decoder variables
     trainable_vars = model.trainable_variables
     # Calculate gradient
     ae_grads = ae_tape.gradient(loss, trainable_vars)
     # And then apply the gradient to change the weights
-    ae_optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    ae_optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     ae_optimizer.apply_gradients(zip(ae_grads, trainable_vars))
 
     # Loss is returned to monitor it while training
     return loss, ae_optimizer
 
+@tf.function
+def reshape_patch_back(patch_tensor, patch_size):
+    batch_size = np.shape(patch_tensor)[0]
+    seq_length = np.shape(patch_tensor)[1]
+    patch_height = np.shape(patch_tensor)[2]
+    patch_width = np.shape(patch_tensor)[3]
+    channels = np.shape(patch_tensor)[4]
+    img_channels = int(channels / (patch_size*patch_size))
+    a = tf.reshape(patch_tensor, [batch_size, seq_length,
+                                  patch_height, patch_width,
+                                  patch_size, patch_size,
+                                  img_channels])
+    b = tf.transpose(a, [0,1,2,4,3,5,6])
+    img_tensor = tf.reshape(b, [batch_size, seq_length,
+                                patch_height * patch_size,
+                                patch_width * patch_size,
+                                img_channels])
+    return img_tensor
 
 @tf.function
 def reshape_patch(img_tensor, patch_size):
@@ -95,37 +110,40 @@ def normalize_feature_da(feature_da, feature_names=None):
 
 
 if __name__ == '__main__':
-
+    # --------------------- CONSTANTS ------------------
+    
+    TRAIN_HOURS = 24 * 14
+    
     # --------------------------------------------------
+    
     is_clm = True
-    NC_DIR = 'nc_files'
-    static_input = xr.open_dataset(os.path.join(NC_DIR, 'static.nc'))
-    forcing_input = xr.open_dataset(os.path.join(NC_DIR, 'forcings.nc'))
-    target_press_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'press.nc'))
-    target_satur_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'satur.nc'))
-    if is_clm:
-        target_clm_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'clm.nc'))
+    NC_DIR = '/home/hvtran/washita_clm/nc_files'
+    static_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_static.nc'))
+    forcing_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_forcings.nc'))
+    target_flow_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_flow.nc'))
+    target_wtd_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_wtd.nc'))
 
-    num_hidden = [16, 16, 32, 32, 64, 64, 128, 128, 128, 48]
+    num_hidden = [1028]*8
     num_layers = len(num_hidden)
     delta = 0.00002
     base = 0.99998
     eta = 1
-    filter_size = 5
     reverse_input = True
+    filter_size = 5
+    
     # --------------------------------------------------
 
     # TODO: The second argument is simply first_argument.data_vars.keys()
     static_feature_da, static_feature_names = create_feature_or_target_da(
-        static_input,
-        ['prev_press', 'slope_x', 'slope_y', 'perm', 'poros',
-         'rel_perm_alpha', 'rel_perm_N',
-         'satur_alpha', 'satur_N', 'satur_sres', 'satur_ssat',
-         'tensor_x', 'tensor_y', 'tensor_z', 'spec_storage', 'mannings'],
-        0,
-        'feature',
-        flx_same_dt=True
-    )
+            static_input,
+            ['prev_press', 'slope_x', 'slope_y', 'perm', 'poros',
+             'rel_perm_alpha', 'rel_perm_N',
+             'satur_alpha', 'satur_N', 'satur_sres', 'satur_ssat',
+             'tensor_x', 'tensor_y', 'tensor_z', 'spec_storage', 'mannings'],
+            0,
+            'feature',
+            flx_same_dt=True
+        )
 
     one_layer_feats = ['slope_x', 'slope_y', 'spec_storage', 'mannings',
                        'tensor_x', 'tensor_y', 'tensor_z']
@@ -146,18 +164,18 @@ if __name__ == '__main__':
     new_static_feature_da = np.swapaxes(new_static_feature_da, 0, 1)
     new_static_feature_da = np.swapaxes(new_static_feature_da, 1, 2)
     new_static_feature_da = np.swapaxes(new_static_feature_da, 2, 3)
-
+    
     # ---------------------------------------------
     # FORCING
     # ---------------------------------------------
 
     forcing_feature_da, forcing_feature_names = create_feature_or_target_da(
-        forcing_input,
-        ['forcings'],
-        0,
-        'feature',
-        flx_same_dt=True
-    )
+            forcing_input,
+            ['forcings'],
+            0,
+            'feature',
+            flx_same_dt=True
+        )
 
     # Add channel dimension
     if is_clm:
@@ -173,56 +191,35 @@ if __name__ == '__main__':
         forcing_feature_da = forcing_feature_da[..., np.newaxis]
         forcing_feature_da = forcing_feature_da[np.newaxis, ...]
 
+
     # ---------------------------------------------
     # TARGETS
     # ---------------------------------------------
 
-    if is_clm:
-        target_clm = np.repeat(target_clm_input_xr.clm,
-                               repeats=[2] + [1] * (target_clm_input_xr.clm.shape[0] - 1),
-                               axis=0)  # duplicate the first row
-        target_da = np.concatenate([target_press_input_xr.press,
-                                    target_satur_input_xr.satur,
-                                    target_clm], axis=1)
-        target_da = target_da[np.newaxis, ...]
-    else:
-        target_dataset = target_press_input_xr.merge(target_satur_input_xr)
-        target_da, target_names = create_feature_or_target_da(
-            target_dataset,
-            ['press', 'satur'],
-            0,
-            'target',
-            1,
-            flx_same_dt=True
-        )
+    target_da = np.concatenate([target_flow_input_xr.flow], axis=1)
+    target_da = target_da[np.newaxis, ...]
 
-        target_da = target_da.data[np.newaxis, ...]
 
     target_da = np.swapaxes(target_da, 2, 3)
     target_da = np.swapaxes(target_da, 3, 4)
     print(target_da.shape)  # 1, 8761, 41, 41, 123
-
-    list_days = np.arange(0, 365, 30)
-    forcings = []
-    targets = []
-    for ii, timei in enumerate(list_days[:-1]):
-        forcings.append(forcing_feature_da[0, 24*timei: 24*list_days[ii + 1], :, :, :])
-        targets.append(target_da[0, 24*timei: 24*list_days[ii + 1], :, :, :])
-
+    
+    
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
-    TRAIN_HOURS = 24 * 2
-    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :, :, :]
-    target_train = target_da[:, :TRAIN_HOURS, :, :, :]
+    # Trim to get dimension of 40 by 40
+    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, :]
+    target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
+    new_static_feature_da = new_static_feature_da[:, :40, :40, :]
 
     forcing_norm_train = normalize_feature_da(forcing_feature_train)
     target_norm_train = normalize_feature_da(target_train)
 
     t0 = time.time()
-    patch_size = tf.Variable(1)
+    patch_size = tf.Variable(10)
     ims = reshape_patch(forcing_norm_train, patch_size)
     tars = reshape_patch(target_norm_train, patch_size)
-    tars = tars[:, :, :, :, :50]
+    #tars = tars[:, :, :, :, :50]
     t1 = time.time()
     print('reshape time: ' + str(t1 - t0))
 
@@ -230,7 +227,7 @@ if __name__ == '__main__':
     # OPTIMIZER AND LOSS FUNCTION
     # --------------------------------------------------
     # Optimizer and loss function
-    ae_optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
+    ae_optimizer = tf.keras.optimizers.RMSprop(learning_rate=1e-3)
     # MSE works here best
     loss_func = tf.keras.losses.MeanSquaredError()
 
@@ -240,7 +237,6 @@ if __name__ == '__main__':
                      filter_size,
                      ims.shape[1],
                      True,
-                     init_mem=new_static_feature_da
                      )
 
     model.add(mylayer)
@@ -250,16 +246,17 @@ if __name__ == '__main__':
     # TRAIN
     # --------------------------------------------------
     t0 = time.time()
-    for ii in range(51):
-        loss, ae_optimizer = train_step(model, ims, tars, 1e-2)
+    lr = 1e-4
+    for ii in range(100):
+        loss, ae_optimizer = train_step(model, ims, tars, lr)
 
         if reverse_input:
             ims_rev = ims[:, ::-1]
             tars_rev = tars[:, ::-1]
-            tmp_loss, _ = train_step(model, ims_rev, tars_rev, 1e-2)
+            tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
             loss += tmp_loss
             loss = loss / 2
-        if ii % 1 == 0:
+        if ii % 5 == 0:
             t1 = time.time()
             elapsed_time = t1 - t0
             t0 = time.time()

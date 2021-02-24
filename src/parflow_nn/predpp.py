@@ -8,14 +8,13 @@ from parflow_nn.layers.CausalLSTMCell import CausalLSTMCell as cslstm
 
 class PredPP(tf.keras.layers.Layer):
     def __init__(self, shape, output_channels, num_layers,
-                 num_hidden, filter_size, seq_length, tln=True,
+                 num_hidden, filter_size, tln=True,
                  stride=1, init_mem=None):
         super(PredPP, self).__init__()
         self.lstm = []
         self.cell = []
         self.hidden = []
 
-        self.seq_length = seq_length
         self.num_layers = num_layers
         self.num_hidden = num_hidden
         self.filter_size = filter_size
@@ -70,6 +69,7 @@ class PredPP(tf.keras.layers.Layer):
 
     def call(self, input):
         images = input
+        seq_length = images.shape[1]
         init_mem = self.init_mem
         gen_images = []
         if init_mem is not None:
@@ -85,7 +85,8 @@ class PredPP(tf.keras.layers.Layer):
             mem = None
 
         z_t = None
-        for t in range(self.seq_length - 1):
+        for t in range(seq_length - 1):
+            # print(t)
             inputs = images[:, t]
 
             self.hidden[0], self.cell[0], mem = self.lstm[0](inputs, self.hidden[0], self.cell[0], mem)
@@ -99,7 +100,6 @@ class PredPP(tf.keras.layers.Layer):
             gen_images.append(x_gen)
 
         gen_images = tf.stack(gen_images)
-        # [batch_size, seq_length, height, width, channels]
         gen_images = tf.transpose(gen_images, [1, 0, 2, 3, 4])
         return gen_images
 
@@ -110,7 +110,6 @@ class PredPP(tf.keras.layers.Layer):
             'cell': self.cell,
             'hidden': self.hidden,
             'shape': self.shape,
-            'seq_length': self.seq_length,
             'num_layers': self.num_layers,
             'gradient_highway': self.gradient_highway,
             'conv2d': self.conv2d,
