@@ -110,10 +110,6 @@ def normalize_feature_da(feature_da, feature_names=None):
 
 
 if __name__ == '__main__':
-    # --------------------- CONSTANTS ------------------
-    
-    TRAIN_HOURS = 24 * 14
-    
     # --------------------------------------------------
     
     is_clm = True
@@ -121,7 +117,7 @@ if __name__ == '__main__':
     static_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_static.nc'))
     forcing_input = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_forcings.nc'))
     target_flow_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_flow.nc'))
-    target_wtd_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_wtd.nc'))
+    # target_wtd_input_xr = xr.open_dataset(os.path.join(NC_DIR, 'washita_clm_wtd.nc'))
 
     num_hidden = [1028]*8
     num_layers = len(num_hidden)
@@ -207,22 +203,38 @@ if __name__ == '__main__':
     
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
-    # Trim to get dimension of 40 by 40
-    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, :]
+    n_sample = 3
+    n_days = 4
+    TRAIN_HOURS = 24 * n_days * n_sample
+    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, [2,3,6,7]]
     target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
     new_static_feature_da = new_static_feature_da[:, :40, :40, :]
 
+    # ----------------------------------------------
+    # Reshape based on number of samples
+    # ----------------------------------------------
+    forcing_feature_train = np.reshape(forcing_feature_train, (n_sample, 24 * n_days, forcing_feature_train.shape[2], forcing_feature_train.shape[3],
+                                                               forcing_feature_train.shape[4]))
+    target_train = np.reshape(target_train, (n_sample, 24 * n_days, target_train.shape[2], target_train.shape[3],
+                                                               target_train.shape[4]))
+    
     forcing_norm_train = normalize_feature_da(forcing_feature_train)
     target_norm_train = normalize_feature_da(target_train)
 
     t0 = time.time()
-    patch_size = tf.Variable(10)
+    patch_size = tf.Variable(20)
     ims = reshape_patch(forcing_norm_train, patch_size)
     tars = reshape_patch(target_norm_train, patch_size)
-    #tars = tars[:, :, :, :, :50]
+    # tars = tars[:, :, :, :, :50]
     t1 = time.time()
     print('reshape time: ' + str(t1 - t0))
-
+    
+    # Plot samples
+    forcing_mean = np.mean(forcing_feature_train,axis=(2,3,))
+    plt.plot(forcing_mean[0,:,1],'b')
+    plt.plot(forcing_mean[1,:,1],'r')
+    plt.plot(forcing_mean[2,:,1],'m')
+    
     # --------------------------------------------------
     # OPTIMIZER AND LOSS FUNCTION
     # --------------------------------------------------
@@ -243,23 +255,121 @@ if __name__ == '__main__':
     model.compile(optimizer=ae_optimizer, loss=loss_func, metrics='mse')
 
     # --------------------------------------------------
-    # TRAIN
+    # TRAIN with 4 days
     # --------------------------------------------------
     t0 = time.time()
     lr = 1e-4
-    for ii in range(100):
-        loss, ae_optimizer = train_step(model, ims, tars, lr)
+    for ii in range(150):
+        total_loss = 0
+        for jj in range(n_sample):
+            loss, ae_optimizer = train_step(model, ims[jj, :][np.newaxis, ...], 
+                                            tars[jj, :][np.newaxis, ...], lr)
+            if reverse_input:
+                ims_rev = ims[jj, ::-1][np.newaxis, ...]
+                tars_rev = tars[jj, ::-1][np.newaxis, ...]
+                tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
+                loss += tmp_loss
+                loss = loss / 2
+            total_loss += loss.numpy()
 
-        if reverse_input:
-            ims_rev = ims[:, ::-1]
-            tars_rev = tars[:, ::-1]
-            tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
-            loss += tmp_loss
-            loss = loss / 2
         if ii % 5 == 0:
             t1 = time.time()
             elapsed_time = t1 - t0
             t0 = time.time()
-            print("loss {:1.6f}, time step {:1.0f}, elapsed_time {:2.4f} s".format(loss.numpy(), ii, elapsed_time))
+            print("loss {:1.6f}, time step {:1.0f}, elapsed_time {:2.4f} s".format(total_loss, ii, elapsed_time))
+    
+    # --------------------------------------------------
+    # TRAIN with 7 days
+    # --------------------------------------------------
+    n_sample = 3
+    n_days = 7
+    TRAIN_HOURS = 24 * n_days * n_sample
+    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, [2,3,6,7]]
+    target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
+    new_static_feature_da = new_static_feature_da[:, :40, :40, :]
+
+    # Reshape based on number of samples
+    forcing_feature_train = np.reshape(forcing_feature_train, (n_sample, 24 * n_days, forcing_feature_train.shape[2], forcing_feature_train.shape[3],
+                                                               forcing_feature_train.shape[4]))
+    target_train = np.reshape(target_train, (n_sample, 24 * n_days, target_train.shape[2], target_train.shape[3],
+                                                               target_train.shape[4]))
+    forcing_norm_train = normalize_feature_da(forcing_feature_train)
+    target_norm_train = normalize_feature_da(target_train)
+
+    t0 = time.time()
+    patch_size = tf.Variable(20)
+    ims = reshape_patch(forcing_norm_train, patch_size)
+    tars = reshape_patch(target_norm_train, patch_size)
+    # tars = tars[:, :, :, :, :50]
+    t1 = time.time()
+    print('reshape time: ' + str(t1 - t0))
+
+    t0 = time.time()
+    lr = 1e-4
+    for ii in range(150):
+        total_loss = 0
+        for jj in range(n_sample):
+            loss, ae_optimizer = train_step(model, ims[jj, :][np.newaxis, ...], 
+                                            tars[jj, :][np.newaxis, ...], lr)
+            if reverse_input:
+                ims_rev = ims[jj, ::-1][np.newaxis, ...]
+                tars_rev = tars[jj, ::-1][np.newaxis, ...]
+                tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
+                loss += tmp_loss
+                loss = loss / 2
+            total_loss += loss.numpy()
+
+        if ii % 5 == 0:
+            t1 = time.time()
+            elapsed_time = t1 - t0
+            t0 = time.time()
+            print("loss {:1.6f}, time step {:1.0f}, elapsed_time {:2.4f} s".format(total_loss, ii, elapsed_time))
+
+    # --------------------------------------------------
+    # TRAIN with 14 days
+    # --------------------------------------------------
+    n_sample = 3
+    n_days = 14
+    TRAIN_HOURS = 24 * n_days * n_sample
+    forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, [2,3,6,7]]
+    target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
+    new_static_feature_da = new_static_feature_da[:, :40, :40, :]
+
+    # Reshape based on number of samples
+    forcing_feature_train = np.reshape(forcing_feature_train, (n_sample, 24 * n_days, forcing_feature_train.shape[2], forcing_feature_train.shape[3],
+                                                               forcing_feature_train.shape[4]))
+    target_train = np.reshape(target_train, (n_sample, 24 * n_days, target_train.shape[2], target_train.shape[3],
+                                                               target_train.shape[4]))
+    forcing_norm_train = normalize_feature_da(forcing_feature_train)
+    target_norm_train = normalize_feature_da(target_train)
+
+    t0 = time.time()
+    patch_size = tf.Variable(20)
+    ims = reshape_patch(forcing_norm_train, patch_size)
+    tars = reshape_patch(target_norm_train, patch_size)
+    # tars = tars[:, :, :, :, :50]
+    t1 = time.time()
+    print('reshape time: ' + str(t1 - t0))
+
+    t0 = time.time()
+    lr = 1e-5
+    for ii in range(300):
+        total_loss = 0
+        for jj in range(n_sample):
+            loss, ae_optimizer = train_step(model, ims[jj, :][np.newaxis, ...], 
+                                            tars[jj, :][np.newaxis, ...], lr)
+            if reverse_input:
+                ims_rev = ims[jj, ::-1][np.newaxis, ...]
+                tars_rev = tars[jj, ::-1][np.newaxis, ...]
+                tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
+                loss += tmp_loss
+                loss = loss / 2
+            total_loss += loss.numpy()
+
+        if ii % 5 == 0:
+            t1 = time.time()
+            elapsed_time = t1 - t0
+            t0 = time.time()
+            print("loss {:1.6f}, time step {:1.0f}, elapsed_time {:2.4f} s".format(total_loss, ii, elapsed_time))
 
     model.save_weights('saved')
