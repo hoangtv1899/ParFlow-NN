@@ -11,22 +11,26 @@ def train_step(model, input, target, learning_rate):
     # prediction = model(input, training=True)
 
     loss_func = tf.keras.losses.MeanSquaredError()
+    n_samples = input.shape[0]
 
     with tf.GradientTape() as ae_tape:
-        prediction = model(input)
-        # Calculate loss
-        loss = loss_func(target[:, 1:], prediction)
+        total_loss = 0
+        for j in range(n_samples):
+            prediction = model(input[j, :][np.newaxis, ...])
+            # Calculate loss
+            loss = loss_func(target[j, 1:][np.newaxis, ...], prediction)
+            # print(loss)
+            total_loss += loss
     # Get the encoder and decoder variables
     trainable_vars = model.trainable_variables
     # Calculate gradient
-    ae_grads = ae_tape.gradient(loss, trainable_vars)
+    ae_grads = ae_tape.gradient(total_loss, trainable_vars)
     # And then apply the gradient to change the weights
     ae_optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
     ae_optimizer.apply_gradients(zip(ae_grads, trainable_vars))
 
     # Loss is returned to monitor it while training
-    return loss, ae_optimizer
-
+    return total_loss, ae_optimizer
 @tf.function
 def reshape_patch_back(patch_tensor, patch_size):
     batch_size = np.shape(patch_tensor)[0]
@@ -124,7 +128,7 @@ if __name__ == '__main__':
     delta = 0.00002
     base = 0.99998
     eta = 1
-    reverse_input = True
+    reverse_input = False
     filter_size = 5
     
     # --------------------------------------------------
@@ -204,7 +208,7 @@ if __name__ == '__main__':
     # forcing_feature_train = np.stack(forcings)
     # target_train = np.stack(targets)
     n_sample = 3
-    n_days = 30
+    n_days = 2
     TRAIN_HOURS = 24 * n_days * n_sample
     forcing_feature_train = forcing_feature_da[:, :TRAIN_HOURS, :40, :40, [2,3,6,7]]
     target_train = target_da[:, :TRAIN_HOURS, :40, :40, :]
@@ -230,11 +234,12 @@ if __name__ == '__main__':
     print('reshape time: ' + str(t1 - t0))
     
     # Plot samples
+    """
     forcing_mean = np.mean(forcing_feature_train,axis=(2,3,))
     plt.plot(forcing_mean[0,:,1],'b')
     plt.plot(forcing_mean[1,:,1],'r')
     plt.plot(forcing_mean[2,:,1],'m')
-    
+    """
     # --------------------------------------------------
     # OPTIMIZER AND LOSS FUNCTION
     # --------------------------------------------------
@@ -254,15 +259,15 @@ if __name__ == '__main__':
     model.add(mylayer)
     model.compile(optimizer=ae_optimizer, loss=loss_func, metrics='mse')
 
-    save_name = '3_samples_2_weeks_8_layers_weights'
+    #save_name = '3_samples_2_weeks_8_layers_weights'
     
     # --------------------------------------------------
     # TRAIN with 4 days
     # --------------------------------------------------
     t0 = time.time()
     lr = 1e-4
-    # curr_loss = 10
-    for ii in range(200):
+    curr_loss = 10
+    for ii in range(100):
         loss, ae_optimizer = train_step(model, ims, tars, lr)
         if reverse_input:
             ims_rev = ims[:, ::-1]
@@ -270,17 +275,20 @@ if __name__ == '__main__':
             tmp_loss, _ = train_step(model, ims_rev, tars_rev, lr)
             loss += tmp_loss
             loss = loss / 2
+        """
         if loss < curr_loss:
             print('save loss: '+str(loss))
             model.save_weights(save_name)
             curr_loss = loss
-
+        """
         if ii % 5 == 0:
             t1 = time.time()
             elapsed_time = t1 - t0
             t0 = time.time()
             print("loss {:1.6f}, time step {:1.0f}, elapsed_time {:2.4f} s".format(loss, ii, elapsed_time))
     
+    import sys
+    sys.exit()
     # --------------------------------------------------
     # TRAIN with 7 days
     # --------------------------------------------------
