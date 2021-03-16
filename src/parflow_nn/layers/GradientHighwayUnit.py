@@ -63,11 +63,11 @@ class GHU(tf.keras.layers.Layer):
             z = self.init_state(x, self.num_features)
         z_concat = self.conv2d_z(z)
         if self.layer_norm:
-            z_concat = tensor_layer_norm(z_concat, 'state_to_state')
+            z_concat = tensor_layer_norm(z_concat)
 
         x_concat = self.conv2d_x(x)
         if self.layer_norm:
-            x_concat = tensor_layer_norm(x_concat, 'input_to_state')
+            x_concat = tensor_layer_norm(x_concat)
 
         gates = tf.add(x_concat, z_concat)
         p, u = tf.split(gates, 2, 3)

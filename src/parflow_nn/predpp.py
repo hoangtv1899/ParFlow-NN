@@ -9,7 +9,7 @@ from parflow_nn.layers.CausalLSTMCell import CausalLSTMCell as cslstm
 class PredPP(tf.keras.layers.Layer):
     def __init__(self, shape, output_channels, num_layers,
                  num_hidden, filter_size, tln=True,
-                 stride=1, init_mem=None):
+                 stride=1, init_cond = False, static_shape = None):
         super(PredPP, self).__init__()
         self.lstm = []
         self.cell = []
@@ -19,7 +19,8 @@ class PredPP(tf.keras.layers.Layer):
         self.num_hidden = num_hidden
         self.filter_size = filter_size
         self.tln = tln
-        self.init_mem = init_mem
+        self.init_cond = init_cond
+        self.static_shape = static_shape
 
         self.gradient_highway = ghu('highway', filter_size, num_hidden[0], tln=tln)
         self.conv2d = tf.keras.layers.SeparableConv2D(filters=output_channels,
@@ -41,7 +42,8 @@ class PredPP(tf.keras.layers.Layer):
                                                            name="after_MobileNET")
 
     def build(self, input_shape):
-        self.shape = input_shape
+        self.shape = input_shape[0]
+        
         for i in range(self.num_layers):
             if i == 0:
                 num_hidden_in = self.num_hidden[self.num_layers - 1]
@@ -51,35 +53,51 @@ class PredPP(tf.keras.layers.Layer):
                                    self.filter_size,
                                    num_hidden_in,
                                    self.num_hidden[i],
-                                   input_shape,
+                                   self.shape,
                                    tln=self.tln)
             self.lstm.append(self.new_cell)
             self.cell.append(None)
             self.hidden.append(None)
-        init_mem = self.init_mem
-        if init_mem is not None:
-            self.mobile_net = tf.keras.applications.MobileNet(
-                input_shape=(input_shape[2], input_shape[3], 3),
-                include_top=False,
-                weights=os.path.join(os.path.dirname(parflow_nn.__file__), 'data', 'mobilenet_1_0_224_tf_no_top.h5')
-            )
+        
+        if self.static_shape:
+            if self.static_shape[2] < 32:
+                self.mob_width_mul = np.ceil(32/(self.static_shape[2])).astype(np.int)
+                self.mob_width = self.static_shape[2]*self.mob_width_mul
+            else:
+                self.mob_width = self.static_shape[2]
+                self.mob_width_mul = 1
 
-            for layer in self.mobile_net.layers:
-                layer.trainable = False
+            if self.static_shape[3] < 32:
+                self.mob_height_mul = np.ceil(32/(self.static_shape[3])).astype(np.int)
+                self.mob_height = self.static_shape[3]*self.mob_height_mul
+            else:
+                self.mob_height = self.static_shape[3]
+                self.mob_height_mul = 1
 
-    def call(self, input):
-        images = input
+            if self.init_cond:
+                self.mobile_net = tf.keras.applications.MobileNet(
+                    input_shape=(self.mob_width, self.mob_height, 3),
+                    include_top=False,
+                    weights=os.path.join(os.path.dirname(parflow_nn.__file__), 'data', 'mobilenet_1_0_224_tf_no_top.h5')
+                )
+
+                for layer in self.mobile_net.layers:
+                    layer.trainable = False
+
+    def call(self, inputs):
+        images = inputs[0]
+        init_mem = inputs[1]
         seq_length = images.shape[1]
-        init_mem = self.init_mem
         gen_images = []
-        if init_mem is not None:
-            tmp_x = self.conv2d_pre(init_mem)
+        if self.init_cond:
+            tmp_x = tf.keras.layers.UpSampling2D(size = (self.mob_width_mul, self.mob_height_mul))(init_mem)
+            tmp_x = self.conv2d_pre(tmp_x)
             for layer in self.mobile_net.layers:
                 tmp_x = layer(tmp_x)
                 if layer.name == 'conv_pw_5_relu':
                     break
-            tmp_x = tf.keras.layers.UpSampling2D(size=(int(self.shape[2] / 5), int(self.shape[3] / 5)))(tmp_x)
-            tmp_x = tf.image.resize_with_pad(tmp_x, self.shape[2], self.shape[3])
+            tmp_x = tf.keras.layers.UpSampling2D(size=(int(self.mob_width / 5), int(self.mob_height / 5)))(tmp_x)
+            tmp_x = tf.keras.layers.MaxPooling2D(pool_size = (self.mob_width/(self.shape[2]), self.mob_height/(self.shape[3])))(tmp_x)
             mem = self.conv2d_post(tmp_x)
         else:
             mem = None

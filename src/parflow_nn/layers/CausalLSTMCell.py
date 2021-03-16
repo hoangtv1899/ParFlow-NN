@@ -105,9 +105,9 @@ class CausalLSTMCell(tf.keras.layers.Layer):
         c_cc = self.conv2d_c(c)
         m_cc = self.conv2d_m(m)
         if self.layer_norm:
-            h_cc = tensor_layer_norm(h_cc, 'h2c')
-            c_cc = tensor_layer_norm(c_cc, 'c2c')
-            m_cc = tensor_layer_norm(m_cc, 'm2m')
+            h_cc = tensor_layer_norm(h_cc)
+            c_cc = tensor_layer_norm(c_cc)
+            m_cc = tensor_layer_norm(m_cc)
 
         i_h, g_h, f_h, o_h = tf.split(h_cc, 4, 3)
         i_c, g_c, f_c = tf.split(c_cc, 3, 3)
@@ -120,7 +120,7 @@ class CausalLSTMCell(tf.keras.layers.Layer):
         else:
             x_cc = self.conv2d_x(x)
             if self.layer_norm:
-                x_cc = tensor_layer_norm(x_cc, 'x2c')
+                x_cc = tensor_layer_norm(x_cc)
 
             i_x, g_x, f_x, o_x, i_x_, g_x_, f_x_ = tf.split(x_cc, 7, 3)
 
@@ -132,7 +132,7 @@ class CausalLSTMCell(tf.keras.layers.Layer):
 
         c2m = self.conv2d_c2m(c_new)
         if self.layer_norm:
-            c2m = tensor_layer_norm(c2m, 'c2m')
+            c2m = tensor_layer_norm(c2m)
 
         i_c, g_c, f_c, o_c = tf.split(c2m, 4, 3)
 
@@ -149,7 +149,7 @@ class CausalLSTMCell(tf.keras.layers.Layer):
 
         o_m = self.conv2d_m2o(m_new)
         if self.layer_norm:
-            o_m = tensor_layer_norm(o_m, 'm2o')
+            o_m = tensor_layer_norm(o_m)
 
         if x is None:
             o = tf.tanh(o_h + o_c + o_m)
