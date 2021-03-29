@@ -11,6 +11,7 @@ from parflow_nn import config
 
 
 def pfread(pfbfile):
+    # print(pfbfile)
     """
     Read a pfb file and return data as an ndarray
     :param pfbfile: path to pfb file
@@ -81,7 +82,7 @@ def parse_metadata(metadata_file):
     ), output_data, time_range, p
 
 
-def init_arrays(metadata_file):
+def init_arrays(metadata_file, t_start0 = config.init.t0):
     m, output_data, time_range, p = parse_metadata(metadata_file)
 
     indi_arr = pfread(m.indi_file)
@@ -124,7 +125,6 @@ def init_arrays(metadata_file):
     else:
         icp_arr = pfread(m.icp_file)
 
-    t_start0 = config.init.t0
     lat0 = np.arange(m.y0, m.y0 + m.ny * m.dy, m.dy)
     lon0 = np.arange(m.x0, m.x0 + m.nx * m.dx, m.dx)
     if (dz_scale is None) or (len(dz_scale) == 1):
@@ -188,9 +188,9 @@ def init_arrays_with_pfbs(metadata_file):
     return {key: np.stack([pfread(file) for file in output_data[key]]) for key in output_data}
 
 
-def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, islev=True):
+def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, t_start0 = config.init.t0.strftime('%Y-%m-%d'), islev=True):
 
-    with nc4.Dataset(out_nc, 'w', format=config.netcdf.format) as f:
+    with nc4.Dataset(out_nc, 'w', format='NETCDF4') as f:
 
         # create dimensions
         f.createDimension('lat', ny)
@@ -209,7 +209,7 @@ def write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, var_outs, islev=
         lev.units = 'depth from the surface (m)'
         lev.long_name = 'level'
         time = f.createVariable('time', np.float64, ('time',))
-        time.units = 'hours since ' + config.init.t0.strftime('%Y-%m-%d')
+        time.units = 'hours since ' + t_start0
         time.long_name = 'time'
 
         # writing data

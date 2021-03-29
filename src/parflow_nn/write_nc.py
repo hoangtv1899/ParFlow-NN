@@ -1,7 +1,7 @@
 import sys
 import os
 import shutil
-from datetime import timedelta
+from datetime import datetime, timedelta
 import numpy as np
 
 from parflow_nn.parsePF import init_arrays, init_arrays_with_pfbs, write_nc
@@ -10,9 +10,28 @@ from parflow_nn import config
 from pfspinup.common import calculate_water_table_depth, \
     calculate_evapotranspiration, calculate_overland_flow
 from pfspinup.pfmetadata import PFMetadata
+from parflowio.pyParflowio import PFData
+
+def pfread(pfbfile):
+    # print(pfbfile)
+    """
+    Read a pfb file and return data as an ndarray
+    :param pfbfile: path to pfb file
+    :return: An ndarray of ndim=3
+
+    TODO: parflowio seems to read arrays such that the rows (i.e. axis=1) are reversed w.r.t what pfio gives us
+    Hence the np.flip
+    """
+    pfb_data = PFData(pfbfile)
+    pfb_data.loadHeader()
+    pfb_data.loadData()
+    arr = pfb_data.moveDataArray()
+    pfb_data.close()
+    assert arr.ndim == 3, 'Only 3D arrays are supported'
+    return np.flip(arr, axis=1)
 
 
-def generate_nc_files(run_dir, overwrite=False, is_clm=True):
+def generate_nc_files(run_dir, t0 = None, overwrite=False, is_clm=True,year=''):
     print('Generating nc files ...')
     out_dir = os.path.join(run_dir, 'nc_files')
 
@@ -25,21 +44,30 @@ def generate_nc_files(run_dir, overwrite=False, is_clm=True):
 
     run_name = os.path.basename(run_dir)
     metadata_file = os.path.join(run_dir, f'{run_name}.out.pfmetadata')
-    nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file)
+    if t0 is not None:
+        nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file, t_start0 = t0)
+    else:
+        nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file)
 
-    time_arrays = time_arrays
-    out_nc = os.path.join(out_dir, f'{run_name}_forcings.nc')
+    out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_forcings.nc')
 
     if is_clm:
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, 8, lat0, lon0, range(8), time_arrays, {'forcings': var_outs['forcings']})
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, 8, lat0, lon0, range(8), time_arrays, {'forcings': var_outs['forcings']}, t_start0 = t0.strftime('%Y-%m-%d'))
+        else:
+            write_nc(out_nc, nx, ny, 8, lat0, lon0, range(8), time_arrays, {'forcings': var_outs['forcings']})
     else:
         if os.path.isfile(out_nc):
             os.remove(out_nc)
         new_forcing_arr = np.stack([p[-1, ...] for p in var_outs['forcings']])
-        write_nc(out_nc, nx, ny, 1, lat0, lon0, np.array([0]), time_arrays,
-                 {'forcings': new_forcing_arr.reshape(-1, 1, ny, nx)})
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, 1, lat0, lon0, np.array([0]), time_arrays,
+                     {'forcings': new_forcing_arr.reshape(-1, 1, ny, nx)}, t_start0 = t0.strftime('%Y-%m-%d'))
+        else:
+            write_nc(out_nc, nx, ny, 1, lat0, lon0, np.array([0]), time_arrays,
+                     {'forcings': new_forcing_arr.reshape(-1, 1, ny, nx)})
 
     del var_outs['forcings']
     del var_outs['prev_press']
@@ -53,49 +81,70 @@ def generate_nc_files(run_dir, overwrite=False, is_clm=True):
     del var_outs['tensor_y']
     del var_outs['tensor_z']
 
-    out_nc = os.path.join(out_dir, f'{run_name}_static.nc')
+    out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_static.nc')
     if os.path.isfile(out_nc):
         os.remove(out_nc)
-    write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, [config.init.t0], var_outs)
+    if t0 is not None:
+        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, [config.init.t0], var_outs, t_start0 = t0.strftime('%Y-%m-%d'))
+    else:
+        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, [config.init.t0], var_outs)
 
     target_arrs = init_arrays_with_pfbs(metadata_file)
 
     if is_clm:
-        out_nc = os.path.join(out_dir, f'{run_name}_press.nc')
+        out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_press.nc')
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours = len(time_arrays))],
-                 {'press': target_arrs['pressure']}) # add the last time step
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours = len(time_arrays))],
+                     {'press': target_arrs['pressure']}, t_start0 = t0.strftime('%Y-%m-%d')) # add the last time step
+        else:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours = len(time_arrays))],
+                     {'press': target_arrs['pressure']})
 
-        out_nc = os.path.join(out_dir, f'{run_name}_satur.nc')
+        out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_satur.nc')
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours=len(time_arrays))],
-                 {'satur': target_arrs['saturation']})  # add the last time step
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours=len(time_arrays))],
+                     {'satur': target_arrs['saturation']}, t_start0 = t0.strftime('%Y-%m-%d'))  # add the last time step
+        else:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays + [time_arrays[0] + timedelta(hours=len(time_arrays))],
+                     {'satur': target_arrs['saturation']})
 
-        out_nc = os.path.join(out_dir, f'{run_name}_clm.nc')
+        out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_clm.nc')
         clm_array = target_arrs['clm_output']
         nlev_clm = clm_array.shape[1]
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, nlev_clm, lat0, lon0, range(nlev_clm), [x + timedelta(hours = 1) for x in time_arrays],
-                 {'clm': clm_array})  # shift the time step by 1 hour
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, nlev_clm, lat0, lon0, range(nlev_clm), [x + timedelta(hours = 1) for x in time_arrays],
+                     {'clm': clm_array}, t_start0 = t0.strftime('%Y-%m-%d'))  # shift the time step by 1 hour
+        else:
+            write_nc(out_nc, nx, ny, nlev_clm, lat0, lon0, range(nlev_clm), [x + timedelta(hours = 1) for x in time_arrays],
+                     {'clm': clm_array})
     else:
-        out_nc = os.path.join(out_dir, f'{run_name}_press.nc')
+        out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_press.nc')
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'press': target_arrs['pressure']})
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'press': target_arrs['pressure']}, t_start0 = t0.strftime('%Y-%m-%d'))
+        else:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'press': target_arrs['pressure']})
 
-        out_nc = os.path.join(out_dir, f'{run_name}_satur.nc')
+        out_nc = os.path.join(out_dir, f'{run_name}_'+year+'_satur.nc')
         if os.path.isfile(out_nc):
             os.remove(out_nc)
-        write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'satur': target_arrs['saturation']})
+        if t0 is not None:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'satur': target_arrs['saturation']}, t_start0 = t0.strftime('%Y-%m-%d'))
+        else:
+            write_nc(out_nc, nx, ny, nz, lat0, lon0, lev0, time_arrays, {'satur': target_arrs['saturation']})
 
 
 
     return out_dir
 
-def generate_nc_file_stream(RUN_DIR, RUN_NAME, overwrite = False):
+def generate_nc_file_stream(RUN_DIR, RUN_NAME, t0 = None, overwrite = False, year=''):
     print('Generating nc files ...')
     out_dir = os.path.join(RUN_DIR, 'nc_files')
 
@@ -110,7 +159,10 @@ def generate_nc_file_stream(RUN_DIR, RUN_NAME, overwrite = False):
     ## Get Forcing and Static .nc using old method
     
     metadata_file = os.path.join(RUN_DIR, f'{RUN_NAME}.out.pfmetadata')
-    nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file)
+    if t0 is not None:
+        nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file, t_start0 = t0)
+    else:
+        nx, ny, nz, dx, dy, dz, dz_scale, time_arrays, lat0, lon0, lev0, var_outs = init_arrays(metadata_file)
 
     # out_nc = os.path.join(out_dir, f'{RUN_NAME}_forcings.nc')
 
@@ -150,7 +202,7 @@ def generate_nc_file_stream(RUN_DIR, RUN_NAME, overwrite = False):
     # ------------------------------------------
     # Time-invariant values
     # ------------------------------------------
-    porosity = metadata.input_data('porosity')
+    # porosity = metadata.input_data('porosity')
     mask = metadata.input_data('mask')
     # Note that only time-invariant ET flux values are supported for now
     
@@ -183,22 +235,28 @@ def generate_nc_file_stream(RUN_DIR, RUN_NAME, overwrite = False):
     overland_flow = np.zeros((nt, ny, nx))
 
     for i, (pressure_file, saturation_file) in enumerate(zip(pressure_files, saturation_files)):
-        pressure = metadata.pfb_data(pressure_file)
-        saturation = metadata.pfb_data(saturation_file)
+        pressure = pfread(pressure_file)
+        saturation = pfread(saturation_file)
 
         wtd[i, ...] = calculate_water_table_depth(pressure, saturation, dz)
 
         overland_flow[i, ...] = calculate_overland_flow(mask, pressure, slopex, slopey, mannings, dx, dy, kinematic=False)
      
-    out_nc = os.path.join(out_dir, f'{RUN_NAME}_flow.nc')
+    out_nc = os.path.join(out_dir, f'{RUN_NAME}_'+year+'_flow.nc')
     if os.path.isfile(out_nc):
         os.remove(out_nc)
-    write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'flow': overland_flow})
+    if t0 is not None:
+        write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'flow': overland_flow}, t_start0 = t0.strftime('%Y-%m-%d'))
+    else:
+        write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'flow': overland_flow})
     
-    out_nc = os.path.join(out_dir, f'{RUN_NAME}_wtd.nc')
+    out_nc = os.path.join(out_dir, f'{RUN_NAME}_'+year+'_wtd.nc')
     if os.path.isfile(out_nc):
         os.remove(out_nc)
-    write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'wtd': wtd})
+    if t0 is not None:
+        write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'wtd': wtd}, t_start0 = t0.strftime('%Y-%m-%d'))
+    else:
+        write_nc(out_nc, nx, ny, 1, lat0, lon0, range(1), time_arrays, {'wtd': wtd})
     
 
 
